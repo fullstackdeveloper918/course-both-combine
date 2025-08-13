@@ -1,0 +1,94 @@
+{
+  "HomePage": {
+    "heading": "Welcome to Your AI Jewelry Design Tool 💎",
+    "learnMore": "This app empowers your customers to generate custom jewelry designs using AI. Easily collect leads, prompt data, and high-quality images — all within your Shopify store.",
+    "startPopulatingYourApp": "Start by setting up your categories, models, and customization options to launch your AI-powered design experience.",
+    "title": "AI Jewelry Generator App",
+    "trophyAltText": "You've successfully launched your Shopify AI Jewelry app!",
+    "yourAppIsReadyToExplore": "Your app is fully connected and ready to use! Customers can now design jewelry using AI-generated images, and you can manage their data from your merchant portal."
+  },
+  "NavigationMenu": {
+    "dashboard": "Dashboard",
+    "customers": "Leads",
+    "jewelry_categories": "Jewelry Categories",
+    "custom_settings": "Customized Settings",
+    "models": "AI Models",
+    "subscriptions": "Subscriptions",
+    "images": "Generated Images",
+    "settings": "App Settings"
+  },
+  "NotFound": {
+    "description": "Check the URL and try again, or return to the dashboard to continue.",
+    "heading": "Page not found"
+  },
+  "dashboard": {
+    "heading": "Merchant Dashboard",
+    "body": "Overview of leads, generated images, and customer activity.",
+    "primaryAction": "Go to Leads",
+    "secondaryAction": "View Generated Images",
+    "title": "Dashboard"
+  },
+  "customers": {
+    "body": "Collected customer prompts and generated images.",
+    "heading": "Customer Leads",
+    "primaryAction": "View Leads",
+    "secondaryAction": "Export CSV",
+    "title": "Leads"
+  },
+  "jewelry_categories": {
+    "body": "Manage the different types of jewelry your customers can generate.",
+    "heading": "Jewelry Categories",
+    "primaryAction": "Add Category",
+    "secondaryAction": "Manage Types",
+    "title": "Jewelry Types"
+  },
+  "custom_settings": {
+    "body": "Define additional options like metal type, stone preference, or engraving.",
+    "heading": "Customized Settings",
+    "primaryAction": "Add Setting",
+    "secondaryAction": "Manage Settings",
+    "title": "Customization Options"
+  },
+  "models": {
+    "body": "Manage your AI models and instructions based on style types like Hip-hop or Bridal.",
+    "heading": "AI Models",
+    "primaryAction": "Add Model",
+    "secondaryAction": "Assign to Category",
+    "title": "Model Configurations"
+  },
+  "subscriptions": {
+    "body": "Manage merchant subscriptions, usage plans, and billing.",
+    "heading": "Subscription Management",
+    "primaryAction": "View Plans",
+    "secondaryAction": "View Payment History",
+    "title": "Subscriptions"
+  },
+  "images": {
+    "body": "All generated images by customers, tied with their prompts and selected styles.",
+    "heading": "Generated Images",
+    "primaryAction": "View All",
+    "secondaryAction": "Filter by Category",
+    "title": "Images"
+  },
+  "settings": {
+    "body": "App-wide settings and integrations with your merchant store.",
+    "heading": "App Settings",
+    "primaryAction": "Configure App",
+    "secondaryAction": "Merchant Info",
+    "title": "Settings"
+  },
+  "ProductsCard": {
+    "description": "These are sample entries. Replace with your own product or image data.",
+    "errorCreatingProductsToast": "There was an error saving the product data.",
+    "populateProductsButton": {
+      "one": "Generate {{count}} sample",
+      "other": "Generate {{count}} samples"
+    },
+    "productsCreatedToast": {
+      "one": "{{count}} entry created!",
+      "other": "{{count}} entries created!"
+    },
+    "title": "Design Generator",
+    "totalProductsHeading": "TOTAL DESIGNS"
+  }
+}

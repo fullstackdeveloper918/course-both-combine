@@ -1,0 +1,35 @@
+# Node.js environment config
+.env
+.env.*
+
+# Dependency directories
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# Test coverage output
+coverage/
+
+# macOS system files
+.DS_Store
+
+# ngrok tunnel PID file
+config/tunnel.pid
+
+# Vite build output
+dist/
+
+# Shopify app build and lock files
+.shopify/
+.shopify.lock
+
+# Extensions build output
+extensions/*/build
+
+# SQLite database
+web/database.sqlite
+
+# Archive files
+*.zip

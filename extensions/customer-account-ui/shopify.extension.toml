@@ -1,0 +1,19 @@
+api_version = "2025-04"
+
+[[extensions]]
+name = "custmer-latest"
+handle = "custmer-latest"
+type = "ui_extension"
+
+[[extensions.targeting]]
+module = "./src/OrderStatusBlock.jsx"
+target = "customer-account.order-index.block.render"
+
+
+[extensions.capabilities]
+api_access = true
+network_access = true
+
+[capabilities]
+network_access = true
+block_progress = true

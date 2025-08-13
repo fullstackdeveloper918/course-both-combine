@@ -1,0 +1,92 @@
+{
+  "info": {
+    "_postman_id": "course-management-app-collection",
+    "name": "Course Management App API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Initiate OAuth", "request": { "method": "GET", "url": "{{baseUrl}}/auth" } },
+        { "name": "OAuth Callback", "request": { "method": "GET", "url": "{{baseUrl}}/auth/callback" } },
+        { "name": "Logout", "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" } },
+        { "name": "Get Current User", "request": { "method": "GET", "url": "{{baseUrl}}/auth/user" } },
+        { "name": "Check Auth", "request": { "method": "GET", "url": "{{baseUrl}}/auth/check" } }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        { "name": "Order Created", "request": { "method": "POST", "url": "{{baseUrl}}/orders/create" } },
+        { "name": "Order Cancelled", "request": { "method": "POST", "url": "{{baseUrl}}/orders/cancelled" } },
+        { "name": "Customer Created", "request": { "method": "POST", "url": "{{baseUrl}}/customers/create" } },
+        { "name": "Customer Updated", "request": { "method": "POST", "url": "{{baseUrl}}/customers/update" } },
+        { "name": "Product Created", "request": { "method": "POST", "url": "{{baseUrl}}/products/create" } },
+        { "name": "Product Updated", "request": { "method": "POST", "url": "{{baseUrl}}/products/update" } },
+        { "name": "Product Deleted", "request": { "method": "POST", "url": "{{baseUrl}}/products/delete" } }
+      ]
+    },
+    {
+      "name": "Courses",
+      "item": [
+        { "name": "Get All Courses", "request": { "method": "GET", "url": "{{baseUrl}}/courses" } },
+        { "name": "Get Course By ID", "request": { "method": "GET", "url": "{{baseUrl}}/courses/:id" } },
+        { "name": "Create Course", "request": { "method": "POST", "url": "{{baseUrl}}/courses", "body": { "mode": "raw", "raw": "{\n  \"title\": \"Intro to Shopify\",\n  \"description\": \"Learn the basics of Shopify.\",\n  \"thumbnail\": \"https://example.com/image.png\",\n  \"shopifyProductId\": \"123456789\",\n  \"shopifyHandle\": \"intro-to-shopify\",\n  \"price\": 49.99,\n  \"merchantId\": 1\n}" } } },
+        { "name": "Update Course", "request": { "method": "PUT", "url": "{{baseUrl}}/courses/:id", "body": { "mode": "raw", "raw": "{\n  \"title\": \"Updated Course Title\",\n  \"description\": \"Updated description.\",\n  \"thumbnail\": \"https://example.com/new-image.png\",\n  \"shopifyProductId\": \"987654321\",\n  \"shopifyHandle\": \"updated-course\",\n  \"price\": 59.99,\n  \"status\": \"active\"\n}" } } },
+        { "name": "Delete Course", "request": { "method": "DELETE", "url": "{{baseUrl}}/courses/:id" } }
+      ]
+    },
+    {
+      "name": "Modules",
+      "item": [
+        { "name": "Get All Modules", "request": { "method": "GET", "url": "{{baseUrl}}/modules" } },
+        { "name": "Get Module By ID", "request": { "method": "GET", "url": "{{baseUrl}}/modules/:id" } },
+        { "name": "Create Module", "request": { "method": "POST", "url": "{{baseUrl}}/modules", "body": { "mode": "raw", "raw": "{\n  \"title\": \"Module 1\",\n  \"description\": \"First module\",\n  \"courseId\": 1\n}" } } },
+        { "name": "Update Module", "request": { "method": "PUT", "url": "{{baseUrl}}/modules/:id", "body": { "mode": "raw", "raw": "{\n  \"title\": \"Updated Module Title\",\n  \"description\": \"Updated module description\"\n}" } } },
+        { "name": "Delete Module", "request": { "method": "DELETE", "url": "{{baseUrl}}/modules/:id" } }
+      ]
+    },
+    {
+      "name": "Lessons",
+      "item": [
+        { "name": "Get All Lessons", "request": { "method": "GET", "url": "{{baseUrl}}/lessons" } },
+        { "name": "Get Lesson By ID", "request": { "method": "GET", "url": "{{baseUrl}}/lessons/:id" } },
+        { "name": "Create Lesson", "request": { "method": "POST", "url": "{{baseUrl}}/lessons", "body": { "mode": "raw", "raw": "{\n  \"title\": \"Lesson 1\",\n  \"content\": \"Lesson content here\",\n  \"moduleId\": 1\n}" } } },
+        { "name": "Update Lesson", "request": { "method": "PUT", "url": "{{baseUrl}}/lessons/:id", "body": { "mode": "raw", "raw": "{\n  \"title\": \"Updated Lesson Title\",\n  \"content\": \"Updated lesson content\"\n}" } } },
+        { "name": "Delete Lesson", "request": { "method": "DELETE", "url": "{{baseUrl}}/lessons/:id" } }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        { "name": "Get All Users", "request": { "method": "GET", "url": "{{baseUrl}}/users" } },
+        { "name": "Get User By ID", "request": { "method": "GET", "url": "{{baseUrl}}/users/:id" } },
+        { "name": "Create User", "request": { "method": "POST", "url": "{{baseUrl}}/users", "body": { "mode": "raw", "raw": "{\n  \"shopifyCustomerId\": \"123456\",\n  \"email\": \"user@example.com\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"student\",\n  \"merchantId\": 1\n}" } } },
+        { "name": "Update User", "request": { "method": "PUT", "url": "{{baseUrl}}/users/:id", "body": { "mode": "raw", "raw": "{\n  \"email\": \"newemail@example.com\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"role\": \"admin\",\n  \"isActive\": true,\n  \"subscriptionStatus\": \"active\",\n  \"subscriptionEndDate\": \"2025-12-31\"\n}" } } },
+        { "name": "Delete User", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/:id" } }
+      ]
+    },
+    {
+      "name": "Files",
+      "item": [
+        { "name": "Get All Files", "request": { "method": "GET", "url": "{{baseUrl}}/files" } },
+        { "name": "Get File By ID", "request": { "method": "GET", "url": "{{baseUrl}}/files/:id" } },
+        { "name": "Upload File", "request": { "method": "POST", "url": "{{baseUrl}}/files", "body": { "mode": "formdata", "formdata": [ { "key": "file", "type": "file", "src": "" }, { "key": "lessonId", "type": "text", "value": "1" }, { "key": "courseId", "type": "text", "value": "1" }, { "key": "isDownloadable", "type": "text", "value": "true" } ] } } },
+        { "name": "Update File", "request": { "method": "PUT", "url": "{{baseUrl}}/files/:id", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated File Name\",\n  \"isDownloadable\": false\n}" } } },
+        { "name": "Delete File", "request": { "method": "DELETE", "url": "{{baseUrl}}/files/:id" } }
+      ]
+    },
+    {
+      "name": "Progress",
+      "item": [
+        { "name": "Get Progress By ID", "request": { "method": "GET", "url": "{{baseUrl}}/progress/:id" } },
+        { "name": "Update Progress", "request": { "method": "PUT", "url": "{{baseUrl}}/progress/:id", "body": { "mode": "raw", "raw": "{\n  \"progress\": 80,\n  \"completed\": true\n}" } } },
+        { "name": "Delete Progress", "request": { "method": "DELETE", "url": "{{baseUrl}}/progress/:id" } }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" }
+  ]
+} 
