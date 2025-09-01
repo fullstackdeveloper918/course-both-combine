@@ -323,15 +323,16 @@ export const createLesson = async (req, res) => {
     // Session & shop domain extraction
     const session = res.locals.shopify?.session || req.session;
     let shopDomain;
-    if (process.env.NODE_ENV === "development") {
-      shopDomain = process.env.TEST_DOMAIN;
-    } else if (session && session.shop) {
-      shopDomain = session.shop;
-    } else {
-      return res
-        .status(401)
-        .json({ error: "Unauthorized: No valid Shopify session." });
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   shopDomain = process.env.TEST_DOMAIN;
+    // } else if (session && session.shop) {
+    //   shopDomain = session.shop;
+    // } else {
+    //   return res
+    //     .status(401)
+    //     .json({ error: "Unauthorized: No valid Shopify session." });
+    // }
+    shopDomain = session.shop;
 
     // Find merchant
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
@@ -589,15 +590,16 @@ export const createBunnyTusUpload = async (req, res) => {
     // Session & shop domain extraction
     const session = res.locals.shopify?.session || req.session;
     let shopDomain;
-    if (process.env.NODE_ENV === "development") {
-      shopDomain = process.env.TEST_DOMAIN;
-    } else if (session && session.shop) {
-      shopDomain = session.shop;
-    } else {
-      return res
-        .status(401)
-        .json({ error: "Unauthorized: No valid Shopify session." });
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   shopDomain = process.env.TEST_DOMAIN;
+    // } else if (session && session.shop) {
+    //   shopDomain = session.shop;
+    // } else {
+    //   return res
+    //     .status(401)
+    //     .json({ error: "Unauthorized: No valid Shopify session." });
+    // }
+    shopDomain = session.shop;
 
     if (!courseId || !moduleId) {
       throw new ApiError("Course ID and Module ID are required", 400);
@@ -1787,16 +1789,16 @@ export const getLesson = async (req, res) => {
     const session = res.locals.shopify?.session || req.session;
     let shopDomain;
 
-    if (process.env.NODE_ENV === "development") {
-      shopDomain = process.env.TEST_DOMAIN;
-    } else if (session && session.shop) {
-      shopDomain = session.shop;
-    } else {
-      return res
-        .status(401)
-        .json({ error: "Unauthorized: No valid Shopify session." });
-    }
-
+    // if (process.env.NODE_ENV === "development") {
+    //   shopDomain = process.env.TEST_DOMAIN;
+    // } else if (session && session.shop) {
+    //   shopDomain = session.shop;
+    // } else {
+    //   return res
+    //     .status(401)
+    //     .json({ error: "Unauthorized: No valid Shopify session." });
+    // }
+    shopDomain = session.shop;
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
 
     if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);

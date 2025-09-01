@@ -176,7 +176,7 @@ const stripHtml = (html) => {
 
 app.post("/api/products/create", async (req, res) => {
   try {
-    console.log("product create running");
+    const shop = req.headers["x-shopify-shop-domain"];
 
     const { id, title, vendor, status, variants, images } = req.body;
 
@@ -198,14 +198,15 @@ app.post("/api/products/create", async (req, res) => {
     // get the product description
     const description = stripHtml(req.body.body_html); // ✅ plain text description
 
-    // find the merchant
+    // console.log("merchant domain.....", `${vendor}.myshopify.com`);
+    let merchantsData = await Merchant.findAll();
 
     const merchant = await Merchant.findOne({
-      where: { shopifyDomain: `${vendor}.myshopify.com` },
+      where: { shopifyDomain: shop },
     });
-
+    // merchant domain
     if (!merchant) {
-      console.warn("No merchant found ");
+      console.warn("No merchant found... ");
       return;
     }
 
