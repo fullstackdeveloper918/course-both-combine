@@ -13,7 +13,7 @@ import { createObjectCsvWriter } from "csv-writer";
 import path from "path";
 import fs from "fs";
 import Merchant from "../models/Merchant.js";
-import fetch from "node-fetch";
+// import fetch from "node-fetch";
 import csv from "csvtojson";
 import fs2 from "fs/promises";
 import envConfig from "../config/env.js";

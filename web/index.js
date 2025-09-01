@@ -5,7 +5,7 @@ import { join } from "path";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import serveStatic from "serve-static";
-import fetch from "node-fetch";
+// import fetch from "node-fetch";
 
 import shopify from "./shopify.js";
 import productCreator from "./product-creator.js";
