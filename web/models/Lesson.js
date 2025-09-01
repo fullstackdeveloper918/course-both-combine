@@ -18,6 +18,7 @@ Lesson.init(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    // video processing status
     processingStatus: {
       type: DataTypes.TEXT,
       allowNull: true,
@@ -79,6 +80,10 @@ Lesson.init(
       allowNull: true,
     },
 
+    thumbnailDestinationPath: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     // videoDuration: {
     //   type: DataTypes.INTEGER, // in seconds
     //   defaultValue: 0,

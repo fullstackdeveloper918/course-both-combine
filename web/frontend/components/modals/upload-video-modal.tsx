@@ -105,7 +105,7 @@ export default function UploadVideoModal({ isOpen, onClose, onUpload, lessonTitl
                     <Upload className="h-10 w-10 text-gray-400 mb-2" />
                   )}
                   <p className="text-sm font-medium">{file ? file.name : "Drag and drop video, or click to browse"}</p>
-                  <p className="text-xs text-gray-500 mt-1">MP4, MOV, AVI up to 500MB</p>
+                  <p className="text-xs text-gray-500 mt-1">MP4, MOV, AVI up to 2GB</p>
                 </div>
               </label>
             </div>

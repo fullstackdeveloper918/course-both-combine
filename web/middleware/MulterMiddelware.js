@@ -9,48 +9,28 @@ const ensureDir = (dir) => {
 
 ["uploads/videos", "uploads/files", "uploads/csv"].forEach(ensureDir);
 
+// CSV file filter
+const csvFileFilter = (req, file, cb) => {
+  if (file.mimetype === "text/csv") {
+    cb(null, true); // accept
+  } else {
+    cb(new Error("Only CSV files are allowed"), false); // reject
+  }
+};
+
 // === Base Disk Storage Generator ===
-const generateStorage = (videoField = "video", fileField = "file") =>
+const generateStorage = () =>
   multer.diskStorage({
     destination: (req, file, cb) => {
-      const isVideo =
-        file.fieldname === videoField || file.fieldname === "videos";
-      const isCSV = file.mimetype === "text/csv";
-      if (isCSV) return cb(null, "uploads/csv/");
-      cb(null, isVideo ? "uploads/videos/" : "uploads/files/");
+      cb(null, "uploads/"); // all files go here
     },
     filename: (req, file, cb) => {
-      const sanitized = file.originalname.replace(/\s+/g, "_");
-      const uniqueName = `${Date.now()}-${sanitized}`;
+      const sanitized = file.originalname.replace(/\s+/g, "_"); // replace spaces
+      const uniqueName = `${Date.now()}-${sanitized}`; // prepend timestamp
       cb(null, uniqueName);
     },
   });
 
-// === Common File Filter ===
-// const fileFilter = (req, file, cb) => {
-//   const { fieldname, mimetype } = file;
-
-//   const videoFieldNames = ["video", "videos"];
-//   const allowedDocsAndImages = [
-//     "application/pdf",
-//     "image/jpeg",
-//     "image/png",
-//     "text/plain",
-//   ];
-
-//   if (videoFieldNames.includes(fieldname) && mimetype.startsWith("video/"))
-//     return cb(null, true);
-
-//   if (fieldname === "thumbnail" && mimetype.startsWith("image/"))
-//     return cb(null, true);
-
-//   if (fieldname === "file" && allowedDocsAndImages.includes(mimetype))
-//     return cb(null, true);
-
-//   if (fieldname === "csvFile" && mimetype === "text/csv") return cb(null, true);
-
-//   return cb(new Error(`Invalid file type or field: ${fieldname}`), false);
-// };
 const fileFilter = (req, file, cb) => {
   const { fieldname, mimetype } = file;
 
@@ -100,7 +80,49 @@ const fileFilter = (req, file, cb) => {
   );
 };
 
-// === Lesson Upload ===
+// FIle Validation for the lesson upload
+const LessonfileFilter = (req, file, cb) => {
+  const { fieldname, mimetype } = file;
+
+  if (fieldname === "video") {
+    // Only allow mp4 videos
+    if (mimetype === "video/mp4") {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid video format. Only MP4 is allowed."));
+    }
+  } else if (fieldname === "thumbnail") {
+    // Allow common image types for thumbnails
+    if (
+      mimetype === "image/jpeg" ||
+      mimetype === "image/jpg" ||
+      mimetype === "image/png" ||
+      mimetype === "image/gif"
+    ) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error("Invalid thumbnail format. Only JPG, PNG, GIF are allowed.")
+      );
+    }
+  } else if (fieldname === "file") {
+    // Allow common document types - adjust as needed
+    if (
+      mimetype === "application/pdf" ||
+      mimetype === "application/msword" || // .doc
+      mimetype ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || // .docx
+      mimetype === "text/plain" ||
+      mimetype.startsWith("image/")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type for additional files."));
+    }
+  } else {
+    cb(new Error("Unexpected field " + fieldname));
+  }
+};
 
 //  1. Storage that always saves to 'uploads/' folder
 const generateStorageforlessons = () =>
@@ -115,28 +137,16 @@ const generateStorageforlessons = () =>
     },
   });
 
-//  2. Define lessonUpload middleware
+// For lesson Upload
 export const lessonUpload = multer({
   storage: generateStorageforlessons(),
-  fileFilter,
+  fileFilter: LessonfileFilter,
   limits: { fileSize: 600 * 1024 * 1024 }, // 600MB per file
 }).fields([
-  { name: "video", maxCount: 1 },
+  // { name: "video", maxCount: 1 },
   { name: "thumbnail", maxCount: 1 },
   { name: "file", maxCount: 5 },
 ]);
-
-// export const lessonUpload = multer({
-//   storage: generateStorage("video"),
-//   fileFilter,
-//   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB per file
-// }).fields([
-//   { name: "video", maxCount: 1 },
-//   { name: "thumbnail", maxCount: 1 },
-//   { name: "file", maxCount: 5 },
-// ]);
-
-// === Bulk Upload ===
 
 let bulkuploadfields = [
   { name: "videos", maxCount: 10 },
@@ -192,11 +202,12 @@ export const bulkupload = multer({
   limits: { fileSize: 2 * 1024 * 1024 * 1024 },
 }).fields(bulkuploadfields);
 
-// === CSV Upload ===
+// === CSV Upload  for the course and module ===
 export const csvupload = multer({
   storage: generateStorage(),
-  fileFilter,
+  fileFilter: csvFileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // Limit CSV to 5MB
 }).single("csvFile");
 
+// For Single File Upload Used in Course
 export const upload = multer({ dest: "./uploads/" });

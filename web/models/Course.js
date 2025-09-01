@@ -41,7 +41,7 @@ Course.init(
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM("draft", "active", "archived"),
+      type: DataTypes.ENUM("draft", "active"),
       defaultValue: "draft",
     },
     isPublished: {
@@ -60,10 +60,22 @@ Course.init(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    Colletionid: {
+    collectionid: {
       type: DataTypes.STRING,
       allowNull: true,
     },
+
+    // thumbnailprovider: {
+    //   type: DataTypes.STRING,
+    //   // allowNull: true,
+    //   defaultValue: "shopify",
+    //   // "shopify"  "bunny"
+    // },
+    sync_updated_at: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,

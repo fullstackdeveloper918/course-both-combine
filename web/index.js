@@ -34,8 +34,13 @@ import { DownloadCourseContent } from "./controllers/courseController.js";
 import Lesson from "./models/Lesson.js";
 import { where } from "sequelize";
 import Course from "./models/Course.js";
-import { waitForVideoProcessing } from "./utils/bunnyUtilis.js";
-import  cors from "cors";
+import {
+  createCollection,
+  updateCollectionName,
+  waitForVideoProcessing,
+} from "./utils/bunnyUtilis.js";
+import cors from "cors";
+import slug from "slug";
 
 // Load environment variables
 dotenv.config();
@@ -47,7 +52,7 @@ const __dirname = join(__filename, "..");
 // Initialize Express app
 
 const app = express();
-app.use(cors())
+app.use(cors());
 // app.use(cors({
 //   origin: "*",
 //   methods: "*",
@@ -61,6 +66,10 @@ const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || "3000",
   10
 );
+
+const StreamApiKEY = process.env.STREAM_API_KEY;
+const StreamSecureTokenApi = process.env.STREAM_SECURE_TOKEN_KEY;
+const LibId = process.env.STREAM_LIB_ID;
 // Serve static files based on environment
 const STATIC_PATH =
   process.env.NODE_ENV === "production"
@@ -105,6 +114,7 @@ async function registerAllWebhooks(shop, accessToken) {
         }
       );
       const data = await response.json();
+      console.log("Webhook Data", data);
 
       if (!response.ok) {
         console.error(`Failed to register webhook for ${topic}:`, data);
@@ -158,8 +168,82 @@ app.post(
   shopify.processWebhooks({ webhookHandlers: PrivacyWebhookHandlers })
 );
 
+// Convert HTML to plain text
+const stripHtml = (html) => {
+  if (!html) return "";
+  return html.replace(/<[^>]+>/g, "").trim();
+};
+
 app.post("/api/products/create", async (req, res) => {
   try {
+    console.log("product create running");
+
+    const { id, title, vendor, status, variants, images } = req.body;
+
+    if (!id || !status || !title || !status || !vendor) return;
+
+    if (!variants?.length) {
+      console.warn("No variants found");
+      return;
+    }
+
+    // Check if the product is already created
+    const existingProduct = await Course.findOne({
+      where: { shopifyProductId: id },
+    });
+    if (existingProduct) {
+      // console.warn("Product already created");
+      return;
+    }
+    // get the product description
+    const description = stripHtml(req.body.body_html); // ✅ plain text description
+
+    // find the merchant
+
+    const merchant = await Merchant.findOne({
+      where: { shopifyDomain: `${vendor}.myshopify.com` },
+    });
+
+    if (!merchant) {
+      console.warn("No merchant found ");
+      return;
+    }
+
+    // get the product price
+
+    let price = variants[0].price;
+    // get the product image
+    let thumbnail;
+    if (images?.length) {
+      thumbnail = images[0].src;
+    } else {
+      thumbnail = process.env.DEFAULT_THUMBNAIL;
+    }
+
+    let merchantdetails = merchant.dataValues;
+    // Creating a Collection
+    let collectionId = await createCollection({
+      LibraryId: merchantdetails?.StreamLibraryId || LibId,
+      apiKey: merchantdetails?.StreamApiKEY || StreamApiKEY,
+      name: slug(title),
+    });
+    let bunny_collection_id = collectionId?.guid;
+
+    // create the course
+    const course = await Course.create({
+      title,
+      description,
+      thumbnail,
+      shopifyProductId: id,
+      shopifyHandle: req.body?.handle || "",
+      price,
+      status: req.body?.status,
+      merchantId: merchantdetails.id,
+      collectionid: bunny_collection_id,
+    });
+
+    console.log("Successfully created course");
+
     res.status(200).send({ message: "Webhook received" });
   } catch (error) {
     console.log(error, "error");
@@ -175,23 +259,143 @@ app.post("/api/webhooks/orders/cancelled", async (req, res) => {
   res.status(200).send({ message: "Webhook received" });
 });
 app.post("/api/webhooks/customers/create", async (req, res) => {
-  console.log(req.body, "req.body");
+  // console.log(req.body, "product create data");
   res.status(200).send({ message: "Webhook received" });
 });
 app.post("/api/webhooks/customers/update", async (req, res) => {
-  console.log(req.body, "req.body");
+  // console.log(req.body, "req.body");
   res.status(200).send({ message: "Webhook received" });
 });
 
 app.post("/api/products/update", async (req, res) => {
   try {
-    console.log("product update", req.body);
+    const { id, title, vendor, status, variants, images } = req.body;
+
+    if (!id || !status || !title || !status || !vendor) return;
+
+    if (!variants?.length) {
+      console.warn("No variants  found");
+      return;
+    }
+
+    // // find the merchant
+
+    const merchant = await Merchant.findOne({
+      where: { shopifyDomain: `${vendor}.myshopify.com` },
+    });
+
+    if (!merchant) {
+      console.warn("No merchant found ");
+      return;
+    }
+    let merchantdetails = merchant.dataValues;
+
+    // first get the metafields
+    const metafields = await getProductMetafields(
+      merchantdetails.shopifyDomain,
+      merchantdetails.shopifyAccessToken,
+      id
+    );
+    let sync_updated_at_value = metafields?.find(
+      (metafield) => metafield.key === "sync_updated_at"
+    )?.value;
+
+    sync_updated_at_value = sync_updated_at_value
+      ? new Date(sync_updated_at_value)
+      : null;
+    // // find the course
+    const course = await Course.findOne({
+      where: { shopifyProductId: id },
+    });
+
+    if (!course) {
+      console.warn("No course found ");
+      return;
+    }
+
+    let db_sync_updated_at_value = course.dataValues.sync_updated_at
+      ? new Date(course.dataValues.sync_updated_at)
+      : null;
+
+    console.log("shopify update at", sync_updated_at_value);
+    console.log("db updated at", db_sync_updated_at_value);
+
+    if (sync_updated_at_value && db_sync_updated_at_value) {
+      if (
+        sync_updated_at_value?.getTime() === db_sync_updated_at_value?.getTime()
+      ) {
+        console.warn("No update found ");
+        return;
+      }
+    }
+
+    // // get the product description
+    const description = stripHtml(req.body.body_html); // ✅ plain text description
+    // // get the product price
+    let price = variants[0].price;
+    // // get the product image
+    let thumbnail;
+    // let thumbnailprovider;
+    if (images?.length) {
+      thumbnail = images[0].src;
+      // if (
+      //   thumbnail.startsWith(`https://${process.env.BUNNY_STORAGE_ZONE_NAME}`)
+      // ) {
+      //   thumbnailprovider = "bunny";
+      // } else {
+      //   thumbnailprovider = "shopify";
+      // }
+    } else {
+      thumbnail = course.dataValues?.thumbnail;
+      // thumbnailprovider = course.dataValues?.thumbnailprovider;
+    }
+
+    await course.update({
+      title,
+      description,
+      thumbnail,
+      // thumbnailprovider,
+      shopifyHandle: req.body?.handle || "",
+      price,
+      status: req.body?.status,
+    });
+
+    // Update the bunny collection name
+    let collectionUpdateResponse = await updateCollectionName({
+      LibraryId: merchantdetails?.StreamLibraryId || LibId,
+      collectionId: course.dataValues.collectionid,
+      newName: slug(title),
+      apiKey: merchantdetails?.StreamApiKEY || StreamApiKEY,
+    });
+
+    if (!collectionUpdateResponse.success) {
+      console.warn(
+        `❌ Failed to update collection name ${collectionUpdateResponse?.error}`
+      );
+    }
+
     res.status(200).send({ message: "Webhook received" });
   } catch (error) {
-    console.log(error, "error");
+    console.log(error, "error....");
     res.status(500).send({ message: "Internal server error" });
   }
 });
+
+// method for get the product metafields
+async function getProductMetafields(shopDomain, accessToken, productId) {
+  const res = await fetch(
+    `https://${shopDomain}/admin/api/2023-10/products/${productId}/metafields.json`,
+    {
+      method: "GET",
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  const data = await res.json();
+  return data.metafields; // array of metafields
+}
 // Bunny Streams WebHook
 app.post("/api/BunnyStreamsWebhook", async (req, res) => {
   const { VideoLibraryId, VideoGuid, Status } = req.body;
@@ -269,8 +473,6 @@ app.post("/api/products", async (_req, res) => {
   res.status(status).send({ success: status === 200, error });
 });
 
-
-
 // Serve frontend
 app.use(shopify.cspHeaders());
 app.use(serveStatic(STATIC_PATH, { index: false }));
@@ -315,5 +517,4 @@ app.use("/*", shopify.ensureInstalledOnShop(), async (_req, res, _next) => {
         .replace("%VITE_SHOPIFY_API_KEY%", process.env.SHOPIFY_API_KEY || "")
     );
 });
-// sequelize.sync({ alter: true });
 app.use(errorHandler);
