@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { Upload } from "tus-js-client";
 import crypto from "crypto";
+import { error, log } from "console";
 
 const STORAGE_ZONE_NAME = process.env.BUNNY_STORAGE_ZONE_NAME;
 const ACCESS_KEY = process.env.BUNNY_STORAGE_KEY;
@@ -135,7 +136,7 @@ export const waitForVideoProcessing = async ({
 export const UploadVideoLarge = async ({
   title,
   filePath,
-  collectionid = "6bf7cff5-ce98-4884-b759-f726aed799a0",
+  collectionid,
   AccessKey = StreamApiKEY,
   LibraryId = LibId,
 }) => {
@@ -166,7 +167,7 @@ export const UploadVideoLarge = async ({
 
     if (!createRes.ok) {
       const errorText = await createRes.text();
-      throw new Error(` Failed to create video: ${errorText}`);
+      throw new Error(`Failed to create video: ${errorText}`);
     }
 
     const videoData = await createRes.json();
@@ -292,6 +293,7 @@ export const UploadVideo = async (videoId, filepath) => {
   }
 };
 
+// Creating a collection of the  Course
 export const createCollection = async ({ LibraryId, name, apiKey }) => {
   const res = await fetch(
     `https://video.bunnycdn.com/library/${LibraryId}/collections`,
@@ -311,17 +313,54 @@ export const createCollection = async ({ LibraryId, name, apiKey }) => {
   }
 
   const data = await res.json();
-  console.log(" Collection Created:", data);
+  console.log(" Collection Created Successfully");
   return data;
 };
 
+// Update the collection Name When the course will update
+export const updateCollectionName = async ({
+  LibraryId,
+  collectionId,
+  newName,
+  apiKey,
+}) => {
+  try {
+    const res = await fetch(
+      `https://video.bunnycdn.com/library/${LibraryId}/collections/${collectionId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          AccessKey: apiKey,
+        },
+        body: JSON.stringify({ name: newName }),
+      }
+    );
+
+    if (!res.ok) {
+      const errorText = await res.text();
+
+      return {
+        success: false,
+        error: errorText || "Failed to update collection name",
+      };
+    }
+
+    const data = await res.json();
+    console.log("✅ Collection updated:");
+
+    return { success: true, data: data };
+  } catch (error) {
+    console.log("❌ Collection update failed:", error);
+
+    return { success: false, error: error };
+  }
+};
+// Upload the file to Bunny Storage
 export async function uploadToBunnyStorage(localFilePath, destinationPath) {
   try {
     const fullPath = path.resolve(`./uploads/${localFilePath}`);
     const fileStream = fs.createReadStream(fullPath);
-    console.log("REGION_HOST", process.env.BUNNY_STORAGE_ZONE_NAME);
-    console.log("STORAGE_ZONE_NAME", STORAGE_ZONE_NAME);
-
     const url = `https://${REGION_HOST}/${STORAGE_ZONE_NAME}/${destinationPath}`;
 
     const response = await axios.put(url, fileStream, {
@@ -333,17 +372,11 @@ export async function uploadToBunnyStorage(localFilePath, destinationPath) {
       maxContentLength: Infinity,
     });
 
-    let data = await getFileMetadata(destinationPath);
+    // let data = await getFileMetadata(destinationPath);
 
-    return data;
+    return { success: true, data: response };
   } catch (err) {
-    console.log(err);
-
-    console.error(" Upload failed:", err.response?.data || err.message);
-    return {
-      error: true,
-      message: err.response?.data || err.message,
-    };
+    return { success: false, error: err.response?.data || err.message };
   }
 }
 
@@ -421,13 +454,9 @@ async function getFileMetadata(FILE_PATH) {
       connection,
       acceptRanges,
     };
-    return metadata;
+    return { success: true, data: metadata };
   } catch (error) {
-    console.error(
-      "Failed to get file metadata:",
-      error.response?.data || error.message
-    );
-    return null;
+    return { success: false, error: error.response?.data || error.message };
   }
 }
 
@@ -455,10 +484,9 @@ export const deleteBunnyVideo = async (videoGuid) => {
   }
 };
 
+// deleted file from Bunny Storage
 export const deleteBunnyStorageFile = async (relativePath) => {
   try {
-    console.log("deleteBunnyStorageFile Run");
-
     const url = `https://${REGION_HOST}/${STORAGE_ZONE_NAME}/${relativePath}`;
 
     const response = await axios.delete(url, {
@@ -468,18 +496,50 @@ export const deleteBunnyStorageFile = async (relativePath) => {
     });
 
     if (response.status === 200) {
-      console.log(`Deleted from Bunny Storage: ${relativePath}`);
       return true;
     } else {
       console.warn(
-        ` Failed to delete ${relativePath} - Status: ${response.status}`
+        ` Failed to delete file from the Bunny Storage ${relativePath} - Status: ${response.status}`
       );
       return false;
     }
   } catch (error) {
-    // console.log(error);
-
     console.error(` Error deleting  from Bunny Storage:::::`, error?.message);
+    return false;
+  }
+};
+
+// Deleted the  bunny stream collection
+
+export const deleteStreamCollection = async ({
+  LibraryId,
+  collectionId,
+  apiKey,
+}) => {
+  try {
+    const url = `https://video.bunnycdn.com/library/${LibraryId}/collections/${collectionId}`;
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        AccessKey: apiKey,
+      },
+    });
+
+    if (response.ok) {
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.warn(
+        `⚠️ Failed to delete collection ${collectionId}: ${errorText}`
+      );
+      return false;
+    }
+  } catch (error) {
+    console.error(
+      `❌ Error while deleting collection ${collectionId}:`,
+      error.message
+    );
     return false;
   }
 };

@@ -17,6 +17,7 @@ import * as csv from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 import path from "path";
 import fs from "fs";
+
 import csvParser from "csvtojson";
 import {
   deleteBunnyStorageFile,
@@ -38,68 +39,6 @@ import { ApiError } from "../utils/ApiUtilis.js";
 
 const upload = multer({ dest: "uploads/" });
 
-// Create a new lesson
-// export const createLesson = async (req, res) => {
-//   try {
-//     const {
-//       title,
-//       description,
-//       content,
-//       order,
-//       duration,
-//       moduleId,
-//       courseId,
-//       isPreview,
-//     } = req.body;
-
-//     const video = req.files?.video?.[0];
-//     const file = req.files?.file?.[0]; // optional
-//     console.log(video);
-//     console.log(file);
-
-//     if (!video) {
-//       return res.status(400).json({ error: "Video is required." });
-//     }
-//     let videourl = `/videos/${video?.filename}`;
-//     let fileUrl = null;
-//     if (file) {
-//       fileUrl = `/files/${file?.filename}`;
-//     }
-
-//     const module = await Module.findByPk(moduleId);
-//     if (!module) {
-//       return res.status(404).json({
-//         success: false,
-//         error: "Module not found",
-//       });
-//     }
-
-//     const lesson = await Lesson.create({
-//       title,
-//       description,
-//       content,
-//       order,
-//       duration: 3,
-//       moduleId,
-//       courseId,
-//       videoUrl: videourl,
-//       videoDuration: 3,
-//       isPreview,
-//       fileUrl,
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       data: lesson,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message,
-//     });
-//   }
-// };
-
 // const BUNNY_STREAM_LIBRARY_ID = 'your_library_id';
 // const BUNNY_STREAM_API_KEY = 'your_stream_api_key';
 
@@ -112,185 +51,427 @@ export function getBunnyPublicUrl(destinationPath) {
   return `${PUBLIC_CDN_URL}/${destinationPath}`;
 }
 
+// export const createLesson = async (req, res) => {
+//   const tempFilesToDelete = [];
+//   const bunnyguid = [];
+//   const filestoragepath = [];
+//   let lessonsid = null;
+//   const filesid = [];
+
+//   //  Step 1: Collect all filenames before doing anything else
+//   try {
+//     const video = req.files?.video?.[0];
+//     const thumbnail = req.files?.thumbnail?.[0];
+//     const filearray = req.files?.file || [];
+
+//     // Collect filenames
+//     if (video) tempFilesToDelete.push(video.filename);
+
+//     if (thumbnail) tempFilesToDelete.push(thumbnail.filename);
+//     filearray.forEach((file) => {
+//       tempFilesToDelete.push(file.filename);
+//     });
+
+//     if (!video) throw new ApiError("Video is required.", 400);
+//     // Session
+//     const session = res.locals.shopify?.session || req.session;
+//     let shopDomain;
+//     if (process.env.NODE_ENV === "development") {
+//       shopDomain = process.env.TEST_DOMAIN;
+//     } else if (session && session.shop) {
+//       shopDomain = session.shop;
+//     } else {
+//       return res
+//         .status(401)
+//         .json({ error: "Unauthorized: No valid Shopify session." });
+//     }
+
+//     const merchant = await Merchant.findOne({
+//       where: { shop: shopDomain },
+//     });
+
+//     if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);
+
+//     const merchantId = merchant.id;
+
+//     const accessToken = merchant.shopifyAccessToken;
+//     //  Step 2: Begin main logic
+//     let {
+//       title,
+//       description,
+//       content,
+//       order = null,
+//       moduleId,
+//       courseId,
+//       isPreview = true,
+//     } = req.body;
+
+//     // Get Course Details
+//     const courseData = await Course.findOne({
+//       where: {
+//         id: courseId,
+//         merchantId: merchantId,
+//       },
+//     });
+
+//     if (!courseData) {
+//       throw new Error("Course  not found for the given Merchant.");
+//     }
+
+//     const module = await Module.findOne({
+//       where: {
+//         id: moduleId,
+//         courseId: courseId,
+//       },
+//     });
+
+//     if (!module) {
+//       throw new Error("Module not found for the given course.");
+//     }
+
+//     // 1. Register video
+//     // const videoGuid = await registerVideo(title);
+//     // if (!videoGuid || typeof videoGuid !== "string") {
+//     //   throw new Error("Failed to register video with Bunny.");
+//     // }
+
+//     // bunnyguid?.push(videoGuid);
+
+//     // 2. Upload video
+//     const uploadResult = await UploadVideoLarge({
+//       title,
+//       filePath: video.filename,
+//       collectionid: courseData?.dataValues?.Colletionid,
+//       // AccessKey: merchant?.StreamApiKey,
+//       // LibraryId: merchant?.StreamLibraryId,
+//     });
+
+//     if (!uploadResult?.success || !uploadResult?.videoGuid) {
+//       throw new Error("Failed to upload video file to Bunny.");
+//     }
+
+//     const videoGuid = uploadResult.videoGuid;
+//     bunnyguid?.push(videoGuid);
+
+//     // 3. Upload thumbnail
+//     let thumbnailUrl = null;
+//     if (thumbnail) {
+//       const destination = `thumbnails/${Date.now()}-${thumbnail.originalname}`;
+//       const result = await uploadToBunnyStorage(
+//         thumbnail.filename,
+//         destination
+//       );
+//       if (result?.error) {
+//         throw new Error("Failed to upload thumbnail.");
+//       }
+//       filestoragepath.push(destination);
+//       thumbnailUrl = getBunnyPublicUrl(destination);
+//     }
+
+//     // 4. Upload supporting files
+//     const fileUrls = [];
+//     for (const file of filearray) {
+//       const destPath = `files/${Date.now()}-${file.originalname}`;
+//       const upload = await uploadToBunnyStorage(file.filename, destPath);
+//       if (upload?.error) {
+//         throw new Error(`Failed to upload file: ${file.originalname}`);
+//       }
+//       filestoragepath.push(destPath);
+
+//       fileUrls.push({ url: getBunnyPublicUrl(destPath), ...upload });
+//     }
+
+//     // 5. Check module
+
+//     // 6. Get video info
+//     const videoInfo = await waitForVideoProcessing({ videoGuid, maxTries: 1 });
+
+//     let videoDuration = 0;
+//     if (videoInfo.success) {
+//       videoDuration = videoInfo?.data.length;
+//     }
+
+//     const lessonCount = await Lesson.count({
+//       where: { courseId, moduleId: module.id },
+//     });
+//     if (lessonCount === 0) {
+//       order = 1;
+//     } else if (order == null || order == 0) {
+//       order = lessonCount + 1;
+//     } else {
+//       const AfterLessons = await Lesson.findAll({
+//         where: {
+//           courseId,
+//           moduleId: module.id,
+//           order: { [Op.gte]: order },
+//         },
+//         order: [["order", "ASC"]],
+//       });
+
+//       for (let data of AfterLessons) {
+//         await Lesson.update(
+//           { order: data.order + 1 },
+//           { where: { id: data.id } }
+//         );
+//       }
+//     }
+
+//     // 7. Create lesson
+//     const lesson = await Lesson.create({
+//       title,
+//       description,
+//       content,
+//       order,
+//       moduleId,
+//       courseId,
+//       isPreview,
+//       videoUrl: ``,
+//       thumbnail: thumbnailUrl,
+//       fileUrls,
+//       duration: videoDuration,
+//       merchantId: merchant?.id,
+//       videoId: videoGuid,
+//       libaryId: merchant?.streamLibraryId || process.env.STREAM_LIB_ID,
+//     });
+
+//     if (!lesson) throw new Error("Failed to Create Lesson");
+
+//     const TotalLessonCount = await Lesson.count({
+//       where: { courseId, deleteFlag: false },
+//     });
+
+//     await Course.update(
+//       { totalLessons: TotalLessonCount },
+//       { where: { id: courseId } }
+//     );
+//     const TotalmoduleLessonCount = await Lesson.count({
+//       where: { courseId, moduleId, deleteFlag: false },
+//     });
+//     await Module.update(
+//       { totalLessons: TotalmoduleLessonCount },
+//       { where: { id: moduleId } }
+//     );
+//     lessonsid = lesson.id;
+//     // 8. Create file records
+//     for (let i in fileUrls) {
+//       let filecreate = await File.create({
+//         url: fileUrls[i].url,
+//         mimeType: filearray[i]?.contentType,
+//         lessonId: lesson.id,
+//         courseId,
+//         size: filearray[i]?.size,
+//       });
+//       if (!filecreate) throw new Error("Faild to create a File");
+//       filesid.push(filecreate.id);
+//     }
+//     // 9. Respond
+//     res.status(201).json({
+//       success: true,
+//       data: lesson,
+//     });
+//   } catch (error) {
+//     console.log(error);
+
+//     for (let videoStreamid of bunnyguid) {
+//       await deleteBunnyVideo(videoStreamid);
+//     }
+//     for (let filestorageid of filestoragepath) {
+//       await deleteBunnyStorageFile(filestorageid);
+//     }
+//     if (lessonsid) {
+//       await Lesson.destroy({ where: { id: lessonsid } });
+//     }
+//     for (let fileid of filesid) {
+//       await File.destroy({ where: { id: fileid } });
+//     }
+//     console.log(error);
+
+//     res.status(500).json({
+//       success: false,
+//       error: error.message || "Internal Server Error",
+//     });
+//   } finally {
+//     await Promise.all(
+//       tempFilesToDelete.map(async (filename) => {
+//         try {
+//           await fs2.unlink(path.join("uploads", filename));
+//         } catch (err) {
+//           console.warn(` Failed to delete file ${filename}: ${err.message}`);
+//         }
+//       })
+//     );
+//   }
+// };
+
+// Create Lesson
 export const createLesson = async (req, res) => {
-  console.log(req,"check request is visible");
-
   const tempFilesToDelete = [];
-  const bunnyguid = [];
-  const filestoragepath = [];
-  let lessonsid = null;
-  const filesid = [];
+  const bunnyStoragePaths = [];
+  let lessonId = null;
+  const createdFileIds = [];
 
-  //  Step 1: Collect all filenames before doing anything else
   try {
-    const video = req.files?.video?.[0];
+    // thumbnail
     const thumbnail = req.files?.thumbnail?.[0];
-    const filearray = req.files?.file || [];
+    // All supporting files
+    const fileArray = req.files?.file || [];
 
-    if (!video) {
-      return res.status(400).json({ error: "Video is required." });
-    }
-
-    // Collect filenames
-    tempFilesToDelete.push(video.filename);
+    // Collect filenames for cleanup of non-video files (video not uploaded here)
     if (thumbnail) tempFilesToDelete.push(thumbnail.filename);
-    filearray.forEach((file) => {
-      tempFilesToDelete.push(file.filename);
-    });
+    fileArray.forEach((file) => tempFilesToDelete.push(file.filename));
 
-    // Session
+    // Session & shop domain extraction
     const session = res.locals.shopify?.session || req.session;
     let shopDomain;
-    if (process.env.NODE_ENV === "development") {
-      shopDomain = process.env.TEST_DOMAIN;
-      console.log(shopDomain, "shopDomaincreateCourse");
-    } else if (session && session.shop) {
-      shopDomain = session.shop;
-    } else {
-      return res
-        .status(401)
-        .json({ error: "Unauthorized: No valid Shopify session." });
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   shopDomain = process.env.TEST_DOMAIN;
+    // } else if (session && session.shop) {
+    //   shopDomain = session.shop;
+    // } else {
+    //   return res
+    //     .status(401)
+    //     .json({ error: "Unauthorized: No valid Shopify session." });
+    // }
+    shopDomain = session.shop;
 
-    const merchant = await Merchant.findOne({
-      where: { shop: shopDomain },
-    });
+    // Find merchant
+    const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
+    if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);
 
-    console.log(shopDomain, merchant,"visible data see keys")
-
-    if (!merchant) {
-      return res
-        .status(404)
-        .json({ error: "Merchant not found for this shop." });
-    }
-
-    const merchantId = merchant.id;
-    console.log("merchantId", merchantId);
-
-    const accessToken = merchant.shopifyAccessToken;
-    // console.log("accessTokencreateCourse", accessToken);
-    //  Step 2: Begin main logic
-    let {
+    const {
       title,
       description,
       content,
-      order = null,
+      order: inputOrder = null,
       moduleId,
       courseId,
+      videoGuid, // passed from frontend after client uploads video using pre-signed URL
       isPreview = true,
     } = req.body;
 
-    // Get Course Details
-    const courseData = await Course.findOne({
-      where: {
-        id: courseId,
-        merchantId: merchantId,
-      },
-    });
-
-    if (!courseData) {
-      throw new Error("Course  not found for the given Merchant.");
-    }
-
-    const module = await Module.findOne({
-      where: {
-        id: moduleId,
-        courseId: courseId,
-      },
-    });
-
-    if (!module) {
-      throw new Error("Module not found for the given course.");
-    }
-
-    // 1. Register video
-    // const videoGuid = await registerVideo(title);
-    // if (!videoGuid || typeof videoGuid !== "string") {
-    //   throw new Error("Failed to register video with Bunny.");
-    // }
-
-    // bunnyguid?.push(videoGuid);
-
-    // 2. Upload video
-    const uploadResult = await UploadVideoLarge({
-      title,
-      filePath: video.filename,
-      collectionid: courseData?.dataValues?.Colletionid,
-      // AccessKey: merchant?.StreamApiKey,
-      // LibraryId: merchant?.StreamLibraryId,
-    });
-
-    if (!uploadResult?.success || !uploadResult?.videoGuid) {
-      throw new Error("Failed to upload video file to Bunny.");
-    }
-
-    const videoGuid = uploadResult.videoGuid;
-    bunnyguid?.push(videoGuid);
-
-    // 3. Upload thumbnail
-    let thumbnailUrl = null;
-    if (thumbnail) {
-      const destination = `thumbnails/${Date.now()}-${thumbnail.originalname}`;
-      const result = await uploadToBunnyStorage(
-        thumbnail.filename,
-        destination
+    if (!videoGuid) {
+      throw new ApiError(
+        "videoGuid is required; client must upload video separately.",
+        400
       );
-      if (result?.error) {
-        throw new Error("Failed to upload thumbnail.");
-      }
-      filestoragepath.push(destination);
-      thumbnailUrl = getBunnyPublicUrl(destination);
     }
 
-    // 4. Upload supporting files
+    // Validate course & module ownership
+    const courseData = await Course.findOne({
+      where: { id: courseId, merchantId: merchant.id },
+    });
+    if (!courseData)
+      throw new ApiError("Course not found for the merchant.", 404);
+
+    const module = await Module.findOne({ where: { id: moduleId, courseId } });
+    if (!module) throw new ApiError("Module not found for the course.", 404);
+
+    // Upload thumbnail if provided
+    let thumbnailUrl = null;
+    let thumbnailDestinationPath = null;
+    if (thumbnail) {
+      try {
+        const destination = `lessonthumbnails/${Date.now()}-${thumbnail.originalname.replace(
+          /\s+/g,
+          "_"
+        )}`;
+        const thumbUpload = await uploadToBunnyStorage(
+          thumbnail.filename,
+          destination
+        );
+        if (!thumbUpload.success) {
+          throw new ApiError(
+            `Failed to upload thumbnail.  ${thumbUpload.error}`,
+            500
+          );
+        }
+        bunnyStoragePaths.push(destination);
+        thumbnailDestinationPath = destination;
+        thumbnailUrl = getBunnyPublicUrl(destination);
+      } catch (error) {
+        console.warn(`Failed to upload thumbnail.  ${error}`);
+      }
+    }
+
+    // Upload supporting files if any
     const fileUrls = [];
-    for (const file of filearray) {
-      const destPath = `files/${Date.now()}-${file.originalname}`;
-      const upload = await uploadToBunnyStorage(file.filename, destPath);
-      if (upload?.error) {
-        throw new Error(`Failed to upload file: ${file.originalname}`);
+    for (const file of fileArray) {
+      try {
+        const destPath = `lessonfiles/${Date.now()}-${file.originalname.replace(
+          /\s+/g,
+          "_"
+        )}`;
+        const upload = await uploadToBunnyStorage(file.filename, destPath);
+        if (!upload.success) {
+          throw new ApiError(
+            `Failed to upload file on bunny storage: ${file.originalname}`,
+            500
+          );
+        }
+        bunnyStoragePaths.push(destPath);
+        fileUrls.push({
+          url: getBunnyPublicUrl(destPath),
+          destPath,
+          mimeType: file?.mimetype || file?.contentType,
+          size: file?.size || 0,
+        });
+      } catch (error) {
+        console.warn(`Failed to upload file.  ${error}`);
       }
-      filestoragepath.push(destPath);
-
-      fileUrls.push({ url: getBunnyPublicUrl(destPath), ...upload });
     }
 
-    // 5. Check module
-
-    // 6. Get video info
-    const videoInfo = await waitForVideoProcessing({ videoGuid, maxTries: 1 });
-
+    // Get video processing info and duration from Bunny Stream API
+    const videoInfo = await waitForVideoProcessing({ videoGuid, maxTries: 10 });
     let videoDuration = 0;
     if (videoInfo.success) {
-      videoDuration = videoInfo?.data.length;
+      videoDuration = videoInfo.data.length;
     }
 
-    const lessonCount = await Lesson.count({
-      where: { courseId, moduleId: module.id },
-    });
+    // Determine lesson order and shift others if needed
+    const lessonCount = await Lesson.count({ where: { courseId, moduleId } });
+
+    let order = inputOrder;
+
     if (lessonCount === 0) {
       order = 1;
-    } else if (order == null || order == 0) {
+    } else if (!order || order <= 0) {
+      order = lessonCount + 1;
+    } else if (order > lessonCount + 1) {
       order = lessonCount + 1;
     } else {
-      const AfterLessons = await Lesson.findAll({
-        where: {
-          courseId,
-          moduleId: module.id,
-          order: { [Op.gte]: order },
-        },
-        order: [["order", "ASC"]],
-      });
-
-      for (let data of AfterLessons) {
-        await Lesson.update(
-          { order: data.order + 1 },
-          { where: { id: data.id } }
-        );
-      }
+      // Bulk increment order for lessons that have order >= desired order
+      await Lesson.increment(
+        { order: 1 },
+        {
+          where: {
+            courseId,
+            moduleId,
+            order: { [Op.gte]: order },
+          },
+        }
+      );
     }
 
-    // 7. Create lesson
+    // const lessonCount = await Lesson.count({ where: { courseId, moduleId } });
+    // let order = inputOrder;
+    // if (lessonCount === 0) {
+    //   order = 1;
+    // } else if (!order || order <= 0) {
+    //   order = lessonCount + 1;
+    // } else {
+    //   const afterLessons = await Lesson.findAll({
+    //     where: { courseId, moduleId, order: { [Op.gte]: order } },
+    //     order: [["order", "ASC"]],
+    //   });
+    //   for (const les of afterLessons) {
+    //     await Lesson.update(
+    //       { order: les.order + 1 },
+    //       { where: { id: les.id } }
+    //     );
+    //   }
+    // }
+
+    // Create lesson record
     const lesson = await Lesson.create({
       title,
       description,
@@ -299,83 +480,577 @@ export const createLesson = async (req, res) => {
       moduleId,
       courseId,
       isPreview,
-      videoUrl: ``,
+      // videoUrl: `https://video.bunnycdn.com/play/${merchant.StreamLibraryId}/${videoGuid}`,
       thumbnail: thumbnailUrl,
-      fileUrls,
+      thumbnailDestinationPath,
+      // fileUrls,
+      processingStatus: videoDuration > 0 ? "completed" : "processing",
       duration: videoDuration,
-      merchantId: merchant?.id,
+      merchantId: merchant.id,
       videoId: videoGuid,
-      libaryId: merchant?.streamLibraryId || process.env.STREAM_LIB_ID,
+      libaryId: merchant.StreamLibraryId || process.env.STREAM_LIB_ID,
     });
+    if (!lesson) throw new ApiError("Failed to create lesson.", 500);
+    lessonId = lesson.id;
 
-    if (!lesson) throw new Error("Failed to Create Lesson");
-
-    const TotalLessonCount = await Lesson.count({
+    // Update total lesson counts for course and module
+    const totalLessonCount = await Lesson.count({
       where: { courseId, deleteFlag: false },
     });
-
     await Course.update(
-      { totalLessons: TotalLessonCount },
+      { totalLessons: totalLessonCount },
       { where: { id: courseId } }
     );
-    const TotalmoduleLessonCount = await Lesson.count({
+
+    const totalModuleLessonCount = await Lesson.count({
       where: { courseId, moduleId, deleteFlag: false },
     });
     await Module.update(
-      { totalLessons: TotalmoduleLessonCount },
+      { totalLessons: totalModuleLessonCount },
       { where: { id: moduleId } }
     );
-    lessonsid = lesson.id;
-    // 8. Create file records
-    for (let i in fileUrls) {
-      let filecreate = await File.create({
-        url: fileUrls[i].url,
-        mimeType: filearray[i]?.contentType,
+
+    // Create File records for supporting files
+    for (let i = 0; i < fileUrls.length; i++) {
+      const fileData = fileUrls[i];
+      const fileRecord = await File.create({
+        url: fileData.url,
+        mimeType: fileData?.mimeType || "",
         lessonId: lesson.id,
         courseId,
-        size: filearray[i]?.size,
+        destinationPath: fileData?.destPath,
+        size: fileData?.size || 0,
       });
-      if (!filecreate) throw new Error("Faild to create a File");
-      filesid.push(filecreate.id);
+      if (!fileRecord) throw new ApiError("Failed to create file record.", 500);
+      createdFileIds.push(fileRecord.id);
     }
-    // 9. Respond
-    res.status(201).json({
-      success: true,
-      data: lesson,
-    });
+
+    return res.status(201).json({ success: true, data: lesson });
   } catch (error) {
-    console.log(error);
+    console.error("Create lesson error:", error);
 
-    for (let videoStreamid of bunnyguid) {
-      await deleteBunnyVideo(videoStreamid);
+    // Delete uploaded Bunny videos and files upon failure
+    if (videoGuid) {
+      try {
+        await deleteBunnyVideo(videoGuid);
+      } catch (err) {
+        console.warn(
+          `Failed to delete Bunny video ${videoGuid}: ${err.message}`
+        );
+      }
     }
-    for (let filestorageid of filestoragepath) {
-      await deleteBunnyStorageFile(filestorageid);
+    for (const filePath of bunnyStoragePaths) {
+      try {
+        await deleteBunnyStorageFile(filePath);
+      } catch (err) {
+        console.warn(
+          `Failed to delete Bunny storage file ${filePath}: ${err.message}`
+        );
+      }
     }
-    if (lessonsid) {
-      await Lesson.destroy({ where: { id: lessonsid } });
-    }
-    for (let fileid of filesid) {
-      await File.destroy({ where: { id: fileid } });
-    }
-    console.log(error);
 
-    res.status(500).json({
+    // Cleanup DB
+    if (lessonId) {
+      await Lesson.destroy({ where: { id: lessonId } });
+    }
+    if (createdFileIds.length > 0) {
+      await File.destroy({ where: { id: createdFileIds } });
+    }
+
+    return res.status(error.status || 500).json({
       success: false,
       error: error.message || "Internal Server Error",
     });
   } finally {
+    // Delete local temp files (thumbnails, supporting files) from uploads folder
     await Promise.all(
       tempFilesToDelete.map(async (filename) => {
+        console.log("temp FIle...", filename);
+
         try {
           await fs2.unlink(path.join("uploads", filename));
+          console.log("deletedd.....");
         } catch (err) {
-          console.warn(` Failed to delete file ${filename}: ${err.message}`);
+          console.warn(
+            `Failed to delete temp file ${filename}: ${err.message}`
+          );
         }
       })
     );
   }
 };
+// Create Video Upload url
+
+export const createBunnyTusUpload = async (req, res) => {
+  try {
+    console.log("createBunnyTusUpload started");
+
+    const { courseId, moduleId } = req.body;
+
+    // Session & shop domain extraction
+    const session = res.locals.shopify?.session || req.session;
+    let shopDomain;
+    // if (process.env.NODE_ENV === "development") {
+    //   shopDomain = process.env.TEST_DOMAIN;
+    // } else if (session && session.shop) {
+    //   shopDomain = session.shop;
+    // } else {
+    //   return res
+    //     .status(401)
+    //     .json({ error: "Unauthorized: No valid Shopify session." });
+    // }
+    shopDomain = session.shop;
+
+    if (!courseId || !moduleId) {
+      throw new ApiError("Course ID and Module ID are required", 400);
+    }
+
+    // Validate merchant, course, and module
+    const merchant = await Merchant.findOne({
+      where: { shopifyDomain: shopDomain },
+    });
+    if (!merchant) {
+      throw new ApiError("Merchant not found", 404);
+    }
+
+    const course = await Course.findOne({
+      where: { id: courseId, merchantId: merchant.id },
+    });
+    if (!course) {
+      throw new ApiError("Course not found or access denied", 404);
+    }
+
+    const module = await Module.findOne({
+      where: { id: moduleId, courseId: courseId },
+    });
+    if (!module) {
+      throw new ApiError("Module not found", 404);
+    }
+
+    // Create video resource on Bunny Stream
+    const streamLibraryId = process.env.STREAM_LIB_ID;
+    const streamApiKEY = process.env.STREAM_API_KEY;
+
+    if (!streamLibraryId || !streamApiKEY) {
+      throw new ApiError("Bunny Stream configuration missing", 500);
+    }
+
+    const createRes = await fetch(
+      `https://video.bunnycdn.com/library/${streamLibraryId}/videos`,
+      {
+        method: "POST",
+        headers: {
+          AccessKey: streamApiKEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: `Lesson Video - ${Date.now()}`,
+          collectionId: course.collectionid,
+        }),
+      }
+    );
+
+    if (!createRes.ok) {
+      const errorText = await createRes.text();
+      throw new ApiError(`Failed to create video resource: ${errorText}`, 500);
+    }
+
+    const videoData = await createRes.json();
+    const videoGuid = videoData.guid;
+
+    if (!videoGuid) {
+      throw new ApiError("Video GUID missing from response", 500);
+    }
+
+    // Bunny Stream uses direct PUT upload, not TUS
+    const uploadUrl = `https://video.bunnycdn.com/library/${streamLibraryId}/videos/${videoGuid}`;
+
+    // Return upload details to frontend
+    return res.json({
+      success: true,
+      videoGuid,
+      uploadUrl,
+      streamLibraryId: streamLibraryId,
+      streamApiKey: streamApiKEY, // Frontend needs this for upload headers
+      collectionId: course.collectionId,
+    });
+  } catch (err) {
+    console.error("Error creating Bunny TUS upload:", err);
+    if (err instanceof ApiError) {
+      return res.status(err.statusCode).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const getVideoProcessingStatus = async (req, res) => {
+  try {
+    const { videoGuid } = req.params;
+    const merchantId = req.session?.merchant?.id;
+
+    if (!merchantId) {
+      throw new ApiError("Merchant not found in session", 401);
+    }
+
+    if (!videoGuid) {
+      throw new ApiError("Video GUID is required", 400);
+    }
+
+    const streamLibraryId = process.env.STREAM_LIB_ID;
+    const streamApiKEY = process.env.STREAM_API_KEY;
+
+    if (!streamLibraryId || !streamApiKEY) {
+      throw new ApiError("Bunny Stream configuration missing", 500);
+    }
+
+    // Get video status from Bunny Stream
+    const statusRes = await fetch(
+      `https://video.bunnycdn.com/library/${streamLibraryId}/videos/${videoGuid}`,
+      {
+        method: "GET",
+        headers: {
+          AccessKey: streamApiKEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!statusRes.ok) {
+      const errorText = await statusRes.text();
+      throw new ApiError(`Failed to get video status: ${errorText}`, 500);
+    }
+
+    const videoData = await statusRes.json();
+
+    // Bunny Stream status values:
+    // 0 = Created, 1 = Uploaded, 2 = Processing, 3 = Finished, 4 = Error, 5 = FinishedWithError
+    const status = videoData.status;
+    const encodeProgress = videoData.encodeProgress || 0;
+
+    let processingStatus = "processing";
+    let processingProgress = 0;
+
+    switch (status) {
+      case 0: // Created
+        processingStatus = "created";
+        processingProgress = 0;
+        break;
+      case 1: // Uploaded
+        processingStatus = "uploaded";
+        processingProgress = 10;
+        break;
+      case 2: // Processing
+        processingStatus = "processing";
+        processingProgress = Math.max(10, encodeProgress);
+        break;
+      case 3: // Finished
+        processingStatus = "completed";
+        processingProgress = 100;
+        break;
+      case 4: // Error
+      case 5: // FinishedWithError
+        processingStatus = "error";
+        processingProgress = 0;
+        break;
+      default:
+        processingStatus = "unknown";
+        processingProgress = 0;
+    }
+
+    return res.json({
+      success: true,
+      videoGuid,
+      status: processingStatus,
+      progress: processingProgress,
+      rawStatus: status,
+      encodeProgress,
+      videoData: {
+        title: videoData.title,
+        length: videoData.length,
+        thumbnailUrl: videoData.thumbnailUrl,
+        previewUrl: videoData.previewUrl,
+      },
+    });
+  } catch (err) {
+    console.error("Error getting video processing status:", err);
+    if (err instanceof ApiError) {
+      return res.status(err.statusCode).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+//   const tempFilesToDelete = [];
+//   const bunnyVideoGuids = [];
+//   const bunnyStoragePaths = [];
+//   let lessonId = null;
+//   const createdFileIds = [];
+
+//   try {
+//     // const video = req.files?.video?.[0];
+//     const thumbnail = req.files?.thumbnail?.[0];
+//     const fileArray = req.files?.file || [];
+
+//     // Collect filenames for cleanup later
+//     // if (video) tempFilesToDelete.push(video.filename);
+//     if (thumbnail) tempFilesToDelete.push(thumbnail.filename);
+//     fileArray.forEach((file) => tempFilesToDelete.push(file.filename));
+
+//     // if (!video) throw new ApiError("Video is required.", 400);
+
+//     // Get shop domain from session or environment
+//     const session = res.locals.shopify?.session || req.session;
+//     let shopDomain;
+//     if (process.env.NODE_ENV === "development") {
+//       shopDomain = process.env.TEST_DOMAIN;
+//     } else if (session && session.shop) {
+//       shopDomain = session.shop;
+//     } else {
+//       return res
+//         .status(401)
+//         .json({ error: "Unauthorized: No valid Shopify session." });
+//     }
+
+//     // Find the merchant by shop domain
+//     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
+//     if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);
+
+//     const merchantId = merchant.id;
+//     const {
+//       title,
+//       description,
+//       content,
+//       order: inputOrder = null,
+//       moduleId,
+//       courseId,
+//       isPreview = true,
+//     } = req.body;
+
+//     // Verify course ownership
+//     const courseData = await Course.findOne({
+//       where: { id: courseId, merchantId },
+//     });
+//     if (!courseData)
+//       throw new ApiError("Course not found for the given Merchant.", 404);
+
+//     // Verify module exists in course
+//     const module = await Module.findOne({ where: { id: moduleId, courseId } });
+//     if (!module)
+//       throw new ApiError("Module not found in the given course.", 404);
+
+//     const createRes = await fetch(
+//       `https://video.bunnycdn.com/library/${merchant.StreamLibraryId}/videos`,
+//       {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//           AccessKey: merchant.StreamApiKEY,
+//         },
+//         body: JSON.stringify({
+//           title,
+//           collectionId: courseData.collectionid,
+//         }),
+//       }
+//     );
+
+//     if (!createRes.ok) {
+//       const errMsg = await createRes.text();
+//       throw new ApiError(
+//         `Failed to create video resource in Bunny: ${errMsg}`,
+//         500
+//       );
+//     }
+
+//     const videoData = await createRes.json();
+//     const videoGuid = videoData.guid;
+//     bunnyVideoGuids.push(videoGuid);
+
+//     // Step 2: Upload thumbnail to Bunny Storage if provided
+//     let thumbnailUrl = null;
+//     if (thumbnail) {
+//       const destination = `lessonthumbnails/${Date.now()}-${thumbnail.originalname.replace(
+//         /\s+/g,
+//         "_"
+//       )}`;
+//       const thumbUpload = await uploadToBunnyStorage(
+//         thumbnail.filename,
+//         destination
+//       );
+//       if (!thumbUpload.success)
+//         throw new ApiError("Failed to upload thumbnail to Bunny Storage.", 500);
+//       bunnyStoragePaths.push(destination);
+//       thumbnailUrl = getBunnyPublicUrl(destination);
+//     }
+
+//     // Step 3: Upload additional supporting files if any
+//     const fileUrls = [];
+//     for (const file of fileArray) {
+//       const destPath = `lessonfiles/${Date.now()}-${file.originalname.replace(
+//         /\s+/g,
+//         "_"
+//       )}`;
+//       const upload = await uploadToBunnyStorage(file.filename, destPath);
+//       if (!upload.success)
+//         throw new ApiError(
+//           `Failed to upload file ${file.originalname} to Bunny Storage.`,
+//           500
+//         );
+//       bunnyStoragePaths.push(destPath);
+//       fileUrls.push({ url: getBunnyPublicUrl(destPath), ...upload });
+//     }
+
+//     // Step 5: Manage lesson order in the module
+//     const lessonCount = await Lesson.count({
+//       where: { courseId, moduleId: module.id },
+//     });
+//     let order = inputOrder;
+//     if (lessonCount === 0) {
+//       order = 1;
+//     } else if (!order || order <= 0) {
+//       order = lessonCount + 1;
+//     } else {
+//       // Shift lessons with order >= this order up by 1
+//       const afterLessons = await Lesson.findAll({
+//         where: {
+//           courseId,
+//           moduleId: module.id,
+//           order: { [Op.gte]: order },
+//         },
+//         order: [["order", "ASC"]],
+//       });
+//       for (const les of afterLessons) {
+//         await Lesson.update(
+//           { order: les.order + 1 },
+//           { where: { id: les.id } }
+//         );
+//       }
+//     }
+
+//     // Step 6: Create the lesson record
+//     const lesson = await Lesson.create({
+//       title,
+//       description,
+//       content,
+//       order,
+//       moduleId,
+//       courseId,
+//       isPreview,
+//       videoUrl: "",
+//       thumbnail: thumbnailUrl,
+//       fileUrls,
+//       duration: videoDuration,
+//       merchantId,
+//       videoId: videoGuid,
+//       libaryId: merchant.StreamLibraryId || process.env.STREAM_LIB_ID,
+//     });
+//     if (!lesson) throw new ApiError("Failed to create lesson.", 500);
+//     lessonId = lesson.id;
+
+//     // Step 7: Update total lesson counts for Course and Module
+//     const totalLessonCount = await Lesson.count({
+//       where: { courseId, deleteFlag: false },
+//     });
+//     await Course.update(
+//       { totalLessons: totalLessonCount },
+//       { where: { id: courseId } }
+//     );
+
+//     const totalModuleLessonCount = await Lesson.count({
+//       where: { courseId, moduleId, deleteFlag: false },
+//     });
+//     await Module.update(
+//       { totalLessons: totalModuleLessonCount },
+//       { where: { id: moduleId } }
+//     );
+
+//     // Step 8: Create file records for supporting files
+//     for (let i = 0; i < fileUrls.length; i++) {
+//       const fileData = fileUrls[i];
+//       const fileMeta = fileArray[i];
+//       const fileRecord = await File.create({
+//         url: fileData.url,
+//         mimeType: fileMeta?.mimetype || fileMeta?.contentType,
+//         lessonId: lesson.id,
+//         courseId,
+//         size: fileMeta?.size || 0,
+//       });
+//       if (!fileRecord) throw new ApiError("Failed to create file record.", 500);
+//       createdFileIds.push(fileRecord.id);
+//     }
+
+//     // Step 9: Success response
+//     return res.status(201).json({
+//       success: true,
+//       data: lesson,
+//     });
+//   } catch (error) {
+//     console.error("Create lesson error:", error);
+
+//     // Cleanup uploaded Bunny videos and files if failure occurs
+//     await Promise.all(
+//       bunnyVideoGuids.map(async (videoGuid) => {
+//         try {
+//           await deleteBunnyVideo(videoGuid);
+//         } catch (e) {
+//           console.warn(`Failed to delete Bunny video: ${videoGuid}`, e.message);
+//         }
+//       })
+//     );
+
+//     await Promise.all(
+//       bunnyStoragePaths.map(async (filePath) => {
+//         try {
+//           await deleteBunnyStorageFile(filePath);
+//         } catch (e) {
+//           console.warn(
+//             `Failed to delete Bunny storage file: ${filePath}`,
+//             e.message
+//           );
+//         }
+//       })
+//     );
+
+//     // Cleanup DB if partial lesson or files created
+//     if (lessonId) {
+//       await Lesson.destroy({ where: { id: lessonId } });
+//     }
+
+//     if (createdFileIds.length) {
+//       await File.destroy({ where: { id: createdFileIds } });
+//     }
+
+//     return res.status(error.status || 500).json({
+//       success: false,
+//       error: error.message || "Internal Server Error",
+//     });
+//   } finally {
+//     // Delete temporary uploaded files from local uploads folder
+//     await Promise.all(
+//       tempFilesToDelete.map(async (filename) => {
+//         try {
+//           await fs.unlink(path.join("uploads", filename));
+//         } catch (err) {
+//           console.warn(
+//             `Failed to delete temp file ${filename}: ${err.message}`
+//           );
+//         }
+//       })
+//     );
+//   }
+// };
+
 // export const BulkUpload = async (req, res) => {
 //   const tempFilesToDelete = [];
 //   const bunnyGuids = [];
@@ -1045,14 +1720,14 @@ export const BulkUpload = async (req, res, next) => {
 // };
 
 // get All Published lessons
+
+// Get All Lessons of a course
 export const getLessons = async (req, res) => {
   try {
     const session = res.locals.shopify?.session || req.session;
     let shopDomain;
 
-
-
-   if (session && session.shop) {
+    if (session && session.shop) {
       shopDomain = session.shop;
     } else {
       return res
@@ -1071,7 +1746,6 @@ export const getLessons = async (req, res) => {
     }
 
     const merchantId = merchant.id;
-    console.log(merchantId ,"merchentId");
 
     const { moduleId, courseId, search } = req.query;
     const where = {
@@ -1089,31 +1763,19 @@ export const getLessons = async (req, res) => {
     }
 
     const lessons = await Lesson.findAll({
-  where: {
-    merchantId,
-    deleteFlag: false, // Add this if you want to filter out deleted lessons
-  },
-  order: [["order", "ASC"]],
-});
-
-    console.log("lesson get", lessons)
-
-    // let hlsurl = generateSecureStreamUrl({
-    //   libraryId: merchant?.LibaryId || "469294",
-    //   videoGuid: lessons?.VideoId,
-    //   securityKey:
-    //     merchant?.StreamTokenkey || "78f9dac5-ba17-4d79-8f67-75e817a42faa",
-    // });
-    // console.log("hlsurl", hlsurl);
+      where: {
+        merchantId,
+        deleteFlag: false, // Add this if you want to filter out deleted lessons
+      },
+      order: [["order", "ASC"]],
+    });
 
     res.status(200).json({
       success: true,
       count: lessons.length,
       data: { lessons },
-      // data: { ...lessons, videoUrl: hlsurl },
     });
   } catch (error) {
-    console.error("getLessons error:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -1127,23 +1789,19 @@ export const getLesson = async (req, res) => {
     const session = res.locals.shopify?.session || req.session;
     let shopDomain;
 
-    if (process.env.NODE_ENV === "development") {
-      shopDomain = process.env.TEST_DOMAIN;
-    } else if (session && session.shop) {
-      shopDomain = session.shop;
-    } else {
-      return res
-        .status(401)
-        .json({ error: "Unauthorized: No valid Shopify session." });
-    }
-
+    // if (process.env.NODE_ENV === "development") {
+    //   shopDomain = process.env.TEST_DOMAIN;
+    // } else if (session && session.shop) {
+    //   shopDomain = session.shop;
+    // } else {
+    //   return res
+    //     .status(401)
+    //     .json({ error: "Unauthorized: No valid Shopify session." });
+    // }
+    shopDomain = session.shop;
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
 
-    if (!merchant) {
-      return res
-        .status(404)
-        .json({ error: "Merchant not found for this shop." });
-    }
+    if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);
 
     const merchantId = merchant.id;
 
@@ -1194,8 +1852,7 @@ export const getLesson = async (req, res) => {
       videoGuid: lesson?.videoId,
       securityKey:
         merchant?.streamSecureTokenApiKey ||
-        // process.env.STREAM_SECURE_TOKEN_KEY,
-        process.env.STREAM_SECURE_TOKEN_KEY
+        process.env.STREAM_SECURE_TOKEN_KEY,
     });
 
     let token = jwt.sign(

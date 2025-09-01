@@ -15,6 +15,7 @@ import { ArrowLeft, Plus, Edit, Trash2, Play, Clock } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import AddLessonModal from "../components/modals/add-lesson-modal";
+import AddLessonModalTus from "../components/modals/add-lesson-modal-tus";
 import UpdateLessonModal from "../components/modals/update-lesson-modal";
 
 export default function LessonsPage() {
@@ -22,14 +23,14 @@ export default function LessonsPage() {
   const [module, setModule] = useState(null);
   const [course, setCourse] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isDialogEditOpen, setIsDialogEditOpen] = useState(false);
+  const [isDialogEditOpen, setIsDialogEditOpen] = useState(false);
 
   const [addLesson, setAddLesson] = useState(null);
-    const [editLesson, setEditLesson] = useState(null);
-    const [editLessonId, setEditLessonId] = useState(null);
+  const [editLesson, setEditLesson] = useState(null);
+  const [editLessonId, setEditLessonId] = useState(null);
 
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -39,11 +40,11 @@ export default function LessonsPage() {
 
   const [courseId, setCourseId] = useState(null);
   const [moduleId, setModuleId] = useState(null);
-  const [error,setError] = useState(null)
-  const [loading, setLoading] = useState(null)
-  const [deleteCourseId,setDeleteCourseId] = useState()
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(null);
+  const [deleteCourseId, setDeleteCourseId] = useState();
   const location = useLocation();
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const courseId = params.get("id");
@@ -55,11 +56,10 @@ export default function LessonsPage() {
     setCourseId(courseId);
     setModuleId(moduleId);
 
-     loadCourse();
+    loadCourse();
     loadModule();
     loadLessons(moduleId);
   }, [location.search]);
-
 
   const loadCourse = () => {
     const savedCourses = localStorage.getItem("courses");
@@ -92,11 +92,11 @@ export default function LessonsPage() {
       const data = await response.json();
       console.log(data, "fetch course data");
 
-        const filteredLessons = Array.isArray(data?.data?.lessons)
-      ? data.data.lessons.filter(module => module.moduleId === moduleId)
-      : [];
+      const filteredLessons = Array.isArray(data?.data?.lessons)
+        ? data.data.lessons.filter((module) => module.moduleId === moduleId)
+        : [];
 
-    setLessons(filteredLessons);
+      setLessons(filteredLessons);
       // setLessons(Array.isArray(data) ? data : data.data || []);
 
       setError(null);
@@ -107,103 +107,116 @@ export default function LessonsPage() {
       setLoading(false);
     }
   }
-const handleLessonSubmit = async (formDataObj) => {
-  const formData = new FormData();
-  formData.append("title", formDataObj.title);
-  formData.append("description", formDataObj.description);
-  formData.append("content", formDataObj.content);
-  formData.append("order", formDataObj.order);
-  formData.append("duration", formDataObj.duration);
-  formData.append("courseId", courseId);
-  formData.append("moduleId", moduleId);
-  if (formDataObj.videoFile)
-    formData.append("video", formDataObj.videoFile, formDataObj.videoFile.name);
-  if (formDataObj.file)
-    formData.append("file", formDataObj.file, formDataObj.file.name);
-  if (formDataObj.thumbnail)
-    formData.append("thumbnail", formDataObj.thumbnail, formDataObj.thumbnail.name);
+  const handleLessonSubmit = async (formDataObj) => {
+    const formData = new FormData();
+    formData.append("title", formDataObj.title);
+    formData.append("description", formDataObj.description);
+    formData.append("content", formDataObj.content);
+    formData.append("order", formDataObj.order);
+    formData.append("duration", formDataObj.duration);
+    formData.append("courseId", courseId);
+    formData.append("moduleId", moduleId);
+    if (formDataObj.videoFile)
+      formData.append(
+        "video",
+        formDataObj.videoFile,
+        formDataObj.videoFile.name
+      );
+    if (formDataObj.file)
+      formData.append("file", formDataObj.file, formDataObj.file.name);
+    if (formDataObj.thumbnail)
+      formData.append(
+        "thumbnail",
+        formDataObj.thumbnail,
+        formDataObj.thumbnail.name
+      );
 
-  try {
-    const res = await fetch("/api/lessons", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const res = await fetch("/api/lessons", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("Upload failed:", err);
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("Upload failed:", err);
+        return false;
+      }
+
+      const data = await res.json();
+      console.log("Upload success:", data);
+      await loadLessons(moduleId);
+      return true;
+    } catch (err) {
+      console.error("Network error:", err);
       return false;
     }
+  };
 
-    const data = await res.json();
-    console.log("Upload success:", data);
-    await loadLessons(moduleId);
-    return true;
-  } catch (err) {
-    console.error("Network error:", err);
-    return false;
+  async function handleSubmit(formData) {
+    if (editLesson) {
+      handleLessonEditSubmit(formData);
+      return true;
+    } else {
+      const success = await handleLessonSubmit(formData);
+      return success; // ← return result to modal
+    }
   }
-};
 
+  const handleLessonEditSubmit = async (formDataObj) => {
+    const formData = new FormData();
+    formData.append("title", formDataObj.title);
+    formData.append("description", formDataObj.description);
+    formData.append("content", formDataObj.content);
+    formData.append("order", formDataObj.order);
+    formData.append("duration", formDataObj.duration);
+    formData.append("courseId", courseId);
+    formData.append("moduleId", moduleId);
+    if (formDataObj.videoFile)
+      formData.append(
+        "video",
+        formDataObj.videoFile,
+        formDataObj.videoFile.name
+      );
+    if (formDataObj.file)
+      formData.append("file", formDataObj.file, formDataObj.file.name);
+    if (formDataObj.thumbnail)
+      formData.append(
+        "thumbnail",
+        formDataObj.thumbnail,
+        formDataObj.thumbnail.name
+      );
 
-async function handleSubmit(formData) {
-  if (editLesson) {
-handleLessonEditSubmit(formData)
-    return true;
-  } else {
-    const success = await handleLessonSubmit(formData);
-    return success; // ← return result to modal
-  }
-}
+    try {
+      const res = await fetch(`/api/lessons/${editLessonId}`, {
+        method: "POST",
+        body: formData,
+      });
 
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("Upload failed:", err);
+        return false;
+      }
 
-const handleLessonEditSubmit = async (formDataObj) => {
-  const formData = new FormData();
-  formData.append("title", formDataObj.title);
-  formData.append("description", formDataObj.description);
-  formData.append("content", formDataObj.content);
-  formData.append("order", formDataObj.order);
-  formData.append("duration", formDataObj.duration);
-  formData.append("courseId", courseId);
-  formData.append("moduleId", moduleId);
-  if (formDataObj.videoFile)
-    formData.append("video", formDataObj.videoFile, formDataObj.videoFile.name);
-  if (formDataObj.file)
-    formData.append("file", formDataObj.file, formDataObj.file.name);
-  if (formDataObj.thumbnail)
-    formData.append("thumbnail", formDataObj.thumbnail, formDataObj.thumbnail.name);
-
-  try {
-    const res = await fetch(`/api/lessons/${editLessonId}`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("Upload failed:", err);
+      const data = await res.json();
+      console.log("Upload success:", data);
+      await loadLessons(moduleId);
+      return true;
+    } catch (err) {
+      console.error("Network error:", err);
       return false;
     }
-
-    const data = await res.json();
-    console.log("Upload success:", data);
-    await loadLessons(moduleId);
-    return true;
-  } catch (err) {
-    console.error("Network error:", err);
-    return false;
-  }
-};
-
+  };
 
   const handleAddLesson = (lesson) => {
     setAddLesson(lesson);
     setIsDialogOpen(true);
   };
 
-  console.log(editLesson?.id,"lesosnssss")
-    const handleEditLesson = (lesson) => {
-      setEditLessonId(lesson.id)
+  console.log(editLesson?.id, "lesosnssss");
+  const handleEditLesson = (lesson) => {
+    setEditLessonId(lesson.id);
     setEditLesson(lesson);
     setIsDialogEditOpen(true);
   };
@@ -214,27 +227,26 @@ const handleLessonEditSubmit = async (formDataObj) => {
     setIsDialogOpen(true);
   };
 
-  
   const handleDeleteLesson = (id) => {
-    setDeleteCourseId(id)
-    setIsDeleteModalOpen(true)
-  }
+    setDeleteCourseId(id);
+    setIsDeleteModalOpen(true);
+  };
 
   const confirmDeletemodule = async () => {
     try {
       const response = await fetch(`/api/lessons/${deleteCourseId}`, {
         method: "DELETE",
-      })
+      });
       if (response.ok) {
-        fetchmodules(id)
-        setIsDeleteModalOpen(false)
+        fetchmodules(id);
+        setIsDeleteModalOpen(false);
       } else {
-        console.error("Failed to delete module")
+        console.error("Failed to delete module");
       }
     } catch (error) {
-      console.error("Error deleting module:", error)
+      console.error("Error deleting module:", error);
     }
-  }
+  };
   return (
     <div className="flex min-h-screen bg-gray-50">
       <div className="flex-1 p-6">
@@ -242,7 +254,7 @@ const handleLessonEditSubmit = async (formDataObj) => {
           <div className="flex items-center mb-6">
             <Button
               variant="ghost"
-              onClick={() =>navigate(`/modules-manager?id=${courseId}`)}
+              onClick={() => navigate(`/modules-manager?id=${courseId}`)}
               className="mr-4 cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -318,7 +330,9 @@ const handleLessonEditSubmit = async (formDataObj) => {
                         size="sm"
                         className="text-[#fff] bg-purple-600 hover:bg-purple-700"
                         onClick={() =>
-                          navigate(`/lessons-detail?id=${courseId}&moduleId=${moduleId}&lessonId=${lesson?.id}`)
+                          navigate(
+                            `/lessons-detail?id=${courseId}&moduleId=${moduleId}&lessonId=${lesson?.id}`
+                          )
                         }
                       >
                         <Play className="w-4 h-4 mr-1" />
@@ -331,31 +345,48 @@ const handleLessonEditSubmit = async (formDataObj) => {
             ))}
           </div>
 
-          <AddLessonModal
+          <AddLessonModalTus
             isOpen={isDialogOpen}
-            onClose={() => setIsDialogOpen(false)} // ✅ PASS FUNCTION
-            onSubmit={handleSubmit}
+            onClose={() => setIsDialogOpen(false)}
+            onSubmit={async (lessonData) => {
+              await loadLessons(moduleId);
+              return true;
+            }}
+            courseId={courseId}
+            moduleId={moduleId}
           />
 
-          {isDialogEditOpen && <UpdateLessonModal
-            isOpen={isDialogEditOpen}
-          onClose={() => setIsDialogEditOpen(false)}
-          onSubmit={handleSubmit}
-          editLessonData={editLesson}
-          />}
+          {isDialogEditOpen && (
+            <UpdateLessonModal
+              isOpen={isDialogEditOpen}
+              onClose={() => setIsDialogEditOpen(false)}
+              onSubmit={handleSubmit}
+              editLessonData={editLesson}
+            />
+          )}
 
-   {isDeleteModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-lg font-semibold mb-4">Confirm Delete</h2>
-            <p>Are you sure you want to delete this module?</p>
-            <div className="flex gap-4 mt-6">
-              <button className="bg-gray-200 px-4 py-2 cursor-pointer rounded" onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
-              <button className="bg-red-600 text-white cursor-pointer px-4 py-2 rounded" onClick={confirmDeletemodule}>Delete</button>
+          {isDeleteModalOpen && (
+            <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+              <div className="bg-white p-6 rounded-lg shadow-lg">
+                <h2 className="text-lg font-semibold mb-4">Confirm Delete</h2>
+                <p>Are you sure you want to delete this module?</p>
+                <div className="flex gap-4 mt-6">
+                  <button
+                    className="bg-gray-200 px-4 py-2 cursor-pointer rounded"
+                    onClick={() => setIsDeleteModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="bg-red-600 text-white cursor-pointer px-4 py-2 rounded"
+                    onClick={confirmDeletemodule}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
           {lessons.length === 0 && (
             <div className="text-center py-12">
               <Play className="w-16 h-16 text-gray-400 mx-auto mb-4" />

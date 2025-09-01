@@ -37,12 +37,12 @@ function CourseCards() {
   }
 
   const payload = decodeJwt(token);
-  const storeDomain = "https://generates-collaboration-screw-mysimon.trycloudflare.com";
+  const storeDomain =
+    "https://ar-preventing-documentation-intense.trycloudflare.com";
 
   useEffect(() => {
     // fetch(`${storeDomain}/api/frontend/courses`)
-        fetch(`/apps/api/frontend/courses`)
-
+    fetch(`/apps/api/frontend/courses`)
       .then((res) => res.json())
       .then(async (data) => {
         if (data.success && Array.isArray(data.data)) {
@@ -183,7 +183,9 @@ function CourseCards() {
                             <video
                               controls
                               width="100%"
-                              onPause={(e) => handlePause(e, lesson, selectedCourse)}
+                              onPause={(e) =>
+                                handlePause(e, lesson, selectedCourse)
+                              }
                               onTimeUpdate={(e) =>
                                 setLastPosition(e.target.currentTime)
                               }
@@ -273,7 +275,10 @@ function CourseCards() {
                   </View>
 
                   <BlockStack spacing="tight" style={{ padding: 16 }}>
-                    <InlineStack spacing="tight" inlineAlignment="space-between">
+                    <InlineStack
+                      spacing="tight"
+                      inlineAlignment="space-between"
+                    >
                       <Badge>{course.category || "Web Development"}</Badge>
                       <TextBlock size="small" appearance="subdued">
                         {course.updatedAt ? `Updated ${course.updatedAt}` : ""}
@@ -294,8 +299,12 @@ function CourseCards() {
                       by {course.instructor || "Instructor"}
                     </TextBlock>
                     <InlineStack spacing="tight">
-                      <TextBlock size="small">{course.rating || "4.9"}</TextBlock>
-                      <TextBlock size="small">{course.students || "2,000"}</TextBlock>
+                      <TextBlock size="small">
+                        {course.rating || "4.9"}
+                      </TextBlock>
+                      <TextBlock size="small">
+                        {course.students || "2,000"}
+                      </TextBlock>
                       <TextBlock size="small">
                         {course.totalLessons || "100"} lessons
                       </TextBlock>

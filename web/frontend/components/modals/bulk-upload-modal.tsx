@@ -135,7 +135,7 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     {uploadType === "videos"
-                      ? "MP4, MOV, AVI up to 500MB each"
+                      ? "MP4, MOV, AVI up to 2GB each"
                       : uploadType === "documents"
                         ? "PDF, DOC, DOCX, PPT, PPTX up to 50MB each"
                         : "CSV file with course data"}

@@ -58,6 +58,10 @@ File.init(
       type: DataTypes.ENUM("s3", "backblaze", "bunny"),
       defaultValue: "bunny",
     },
+    destinationPath: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     bucket: {
       type: DataTypes.STRING,
       allowNull: true,

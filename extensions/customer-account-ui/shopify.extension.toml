@@ -12,8 +12,8 @@ target = "customer-account.order-index.block.render"
 
 [extensions.capabilities]
 api_access = true
-network_access = true
+network_access = false
 
 [capabilities]
-network_access = true
-block_progress = true
+network_access = false
+block_progress = false

@@ -10,6 +10,8 @@ import {
   importLessons,
   BulkUpload,
   DownloadLessonContent,
+  createBunnyTusUpload,
+  getVideoProcessingStatus,
 } from "../controllers/lessonController.js";
 import {
   // upload,
@@ -22,6 +24,10 @@ const router = express.Router();
 
 router.get("/", getLessons);
 router.post("/bulk-upload", bulkupload, BulkUpload);
+// Genrating the tus upload url for bunny stream
+router.post("/createBunnyTusUpload", createBunnyTusUpload);
+// Get video processing status from Bunny Stream
+router.get("/video-status/:videoGuid", getVideoProcessingStatus);
 router.get("/DownloadLessonContent/:id", DownloadLessonContent);
 router.get("/:id", getLesson);
 router.post("/", lessonUpload, createLesson);
