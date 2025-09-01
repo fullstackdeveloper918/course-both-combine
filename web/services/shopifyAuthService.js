@@ -3,7 +3,7 @@
 // const shopifyUtils = require('../utils/shopifyUtils');
 import crypto from 'crypto';
 import config from '../config/config.js';
-import shopifyUtils from '../utils/shopifyUtils';
+import shopifyUtils from '../utils/shopifyUtils.js';
 
 // Generate Shopify OAuth URL
 exports.generateAuthUrl = (shop, state) => {
