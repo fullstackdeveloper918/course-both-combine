@@ -15,7 +15,7 @@ export const app = {
 //   password: process.env.DB_PASSWORD,
 // };
 export const database = {
-  logging: process.env.DB_LOGGING === "true",
+  //logging: process.env.DB_LOGGING === "true",
   host: "srv1331.hstgr.io",
   port: 3306,
   name: "u448961291_course_platfor",
