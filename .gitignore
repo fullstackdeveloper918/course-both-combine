@@ -1,6 +1,5 @@
 # Node.js environment config
-.env
-.env.*
+
 
 # Dependency directories
 node_modules/
