@@ -6,7 +6,6 @@ export const app = {
   baseUrl: process.env.BASE_URL || "http://localhost:3000",
   env: process.env.NODE_ENV || "development",
 };
-
 // export const database = {
 //   logging: process.env.DB_LOGGING === "true",
 //   host: process.env.DB_HOST || "localhost",
@@ -15,16 +14,24 @@ export const app = {
 //   user: process.env.DB_USER,
 //   password: process.env.DB_PASSWORD,
 // };
-
 export const database = {
   logging: process.env.DB_LOGGING === "true",
-  username: "u448961291_course_platfor",
-  password: "Course@platfor123",
-  database: "u448961291_course_platfor",
   host: "srv1331.hstgr.io",
   port: 3306,
-  dialect: "mysql",
+  name: "u448961291_course_platfor",
+  user: "u448961291_course_platfor",
+  password: "Course@platfor123",
 };
+
+// export const database = {
+//   logging: process.env.DB_LOGGING === "true",
+//   username: "u448961291_course_platfor",
+//   password: "Course@platfor123",
+//   database: "u448961291_course_platfor",
+//   host: "srv1331.hstgr.io",
+//   port: 3306,
+//   dialect: "mysql",
+// };
 
 export const shopify = {
   apiKey: process.env.SHOPIFY_API_KEY,
