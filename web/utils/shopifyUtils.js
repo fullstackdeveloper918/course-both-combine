@@ -1,5 +1,7 @@
-const crypto = require('crypto');
-const config = require('../config/config');
+// const crypto = require('crypto');
+// const config = require('../config/config');
+import crypto from 'crypto';
+import config from '../config/config.js';
 
 // Generate Shopify webhook signature
 exports.generateWebhookSignature = (data) => {

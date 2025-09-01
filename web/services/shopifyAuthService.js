@@ -1,6 +1,9 @@
-const crypto = require('crypto');
-const config = require('../config/config');
-const shopifyUtils = require('../utils/shopifyUtils');
+// const crypto = require('crypto');
+// const config = require('../config/config');
+// const shopifyUtils = require('../utils/shopifyUtils');
+import crypto from 'crypto';
+import config from '../config/config.js';
+import shopifyUtils from '../utils/shopifyUtils';
 
 // Generate Shopify OAuth URL
 exports.generateAuthUrl = (shop, state) => {
