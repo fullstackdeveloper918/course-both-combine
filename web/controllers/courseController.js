@@ -36,8 +36,183 @@ const StreamSecureTokenApi = process.env.STREAM_SECURE_TOKEN_KEY;
 const LibId = process.env.STREAM_LIB_ID;
 
 // create a new course
+// export const createCourse = async (req, res, next) => {
+//   //  creating a global variable for this function
+//   let thumbnailpath = "";
+//   let thumbnaillocalfile = "";
+//   let shopify_Product_Id = "";
+//   let bunny_collection_id = "";
+//   let db_course_id = "";
+//   let accessToken = "";
+//   let merchantdetails;
+//   const session = res.locals.shopify?.session || req.session;
+//   console.log(session, "sessioncreateCourse");
+
+//   let shopDomain = session.shop;
+
+//   try {
+//     if (!shopDomain) throw new ApiError("No Shop Domain found.", 401);
+
+//     // getting the thumbnail file
+//     let thumbnail = req.file;
+//     let thumbnailUrl = "";
+//     if (!thumbnail) {
+//       throw new ApiError("Thumbnail is required", 422);
+//     }
+//     thumbnaillocalfile = thumbnail.filename;
+
+//     // Checking the merchant is available or not
+//     const merchant = await Merchant.findOne({
+//       where: { shop: shopDomain },
+//     });
+// console.log("merchant", merchant);
+
+//     if (!merchant) {
+//       throw new ApiError("Merchant not found for this shop.", 404);
+//     }
+
+//     const merchantId = merchant.id;
+//     merchantdetails = merchant;
+//     accessToken = merchant.shopifyAccessToken;
+
+//     // getting the course details
+//     const { title, description, price } = req.body;
+
+//     if (!title || !description || !price) {
+//       throw new ApiError("All fields Are Required", 422);
+//     }
+
+//     // Sanitize the filename
+//     const sanitizedFilename = thumbnail.originalname.replace(/\s+/g, "-");
+//     const extension = path.extname(sanitizedFilename);
+//     const baseName = path.basename(sanitizedFilename, extension);
+//     const uniqueFilename = `${baseName}-${Date.now()}${extension}`;
+
+//     // Final destination
+//     const destination = `Coursethumbnails/${uniqueFilename}`;
+
+//     // Upload to Bunny
+//     const result = await uploadToBunnyStorage(thumbnail.filename, destination);
+//     if (!result.success) {
+//       throw new ApiError(`thumbnail upload failed ->${result.error}`, 422);
+//     }
+//     thumbnailpath = destination;
+
+//     // getting the thumbnail url
+//     thumbnailUrl = getBunnyPublicUrl(destination);
+
+//     // 1. Create product in Shopify
+//     const productPayload = {
+//       product: {
+//         title,
+//         body_html: description,
+//         // images: thumbnail ? [{ src: thumbnail }] : [],
+//         images: thumbnailUrl ? [{ src: thumbnailUrl }] : [],
+//         variants: [
+//           {
+//             price: price ? price.toString() : "0.00",
+//             inventory_management: "shopify",
+//             inventory_policy: "deny",
+//             fulfillment_service: "manual",
+//             requires_shipping: false,
+//           },
+//         ],
+//       },
+//     };
+//     const shopifyRes = await fetch(
+//       `https://${shopDomain}/admin/api/2023-10/products.json`,
+//       {
+//         method: "POST",
+//         headers: {
+//           "X-Shopify-Access-Token": accessToken,
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify(productPayload),
+//       }
+//     );
+//     const shopifyData = await shopifyRes.json();
+
+//     if (!shopifyRes.ok || !shopifyData.product) {
+//       throw new ApiError("Failed to create Shopify product", 500);
+//     }
+//     // getting the shopify product id
+//     const shopifyProductId = shopifyData.product.id;
+//     shopify_Product_Id = shopifyData.product.id;
+//     const shopifyHandle = shopifyData.product.handle;
+
+//     // Creating A Collection of the course
+//     let collectionId = await createCollection({
+//       LibraryId: merchant?.StreamLibraryId || LibId,
+//       apiKey: merchant?.StreamApiKEY || StreamApiKEY,
+//       name: slug(title),
+//     });
+//     bunny_collection_id = collectionId?.guid;
+
+//     // 2. Create course in DB, linked to Shopify product
+//     const course = await Course.create({
+//       title,
+//       description,
+//       thumbnail: thumbnailUrl,
+//       shopifyProductId,
+//       shopifyHandle,
+//       price,
+//       thumbnailDestinationPath: thumbnailpath,
+//       merchantId,
+//       collectionid: collectionId?.guid,
+//       // thumbnailprovider: "bunny",
+//     });
+
+//     db_course_id = course.id;
+
+//     // return the response
+//     res.status(201).json({
+//       success: true,
+//       data: { course, shopifyProduct: shopifyData.product },
+//     });
+//   } catch (error) {
+//     // delete the thumbnail from Bunny Storage
+//     if (thumbnailpath) {
+//       await deleteBunnyStorageFile(thumbnailpath);
+//     }
+
+//     // delete the shopify product
+//     if (shopify_Product_Id) {
+//       await deleteShopifyProduct(shopDomain, accessToken, shopify_Product_Id);
+//     }
+
+//     // delete the course collection
+//     if (bunny_collection_id) {
+//       await deleteStreamCollection({
+//         LibraryId: merchantdetails?.StreamLibraryId || LibId,
+//         collectionId: bunny_collection_id,
+//         apiKey: merchantdetails?.StreamApiKEY || StreamApiKEY,
+//       });
+//     }
+//     if (db_course_id) {
+//       try {
+//         await Course.destroy({ where: { id: db_course_id } });
+//       } catch (error) {
+//         console.warn(" Failed to delete course from the DB", error.message);
+//       }
+//     }
+
+//     return next(
+//       new ApiError(
+//         error?.message || "Something went wrong",
+//         error?.status || 500
+//       )
+//     );
+//   } finally {
+//     if (thumbnaillocalfile) {
+//       try {
+//         await fs2.unlink(path.join("uploads", thumbnaillocalfile));
+//       } catch (err) {
+//         console.warn(" Failed to delete thumbnail from the local", err.message);
+//       }
+//     }
+//   }
+// };
 export const createCourse = async (req, res, next) => {
-  //  creating a global variable for this function
   let thumbnailpath = "";
   let thumbnaillocalfile = "";
   let shopify_Product_Id = "";
@@ -45,70 +220,60 @@ export const createCourse = async (req, res, next) => {
   let db_course_id = "";
   let accessToken = "";
   let merchantdetails;
-  const session = res.locals.shopify?.session || req.session;
 
-  let shopDomain = session.shop;
+  const session = res.locals.shopify?.session || req.session;
+  console.log("➡️ Session in createCourse:", session);
+
+  let shopDomain = session?.shop;
 
   try {
     if (!shopDomain) throw new ApiError("No Shop Domain found.", 401);
 
     // getting the thumbnail file
     let thumbnail = req.file;
-    let thumbnailUrl = "";
-    if (!thumbnail) {
-      throw new ApiError("Thumbnail is required", 422);
-    }
+    if (!thumbnail) throw new ApiError("Thumbnail is required", 422);
+
     thumbnaillocalfile = thumbnail.filename;
 
-    // Checking the merchant is available or not
-    const merchant = await Merchant.findOne({
-      where: { shop: shopDomain },
-    });
+    // Checking the merchant
+    const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
+    console.log("✅ Merchant found:", merchant?.id);
 
-    if (!merchant) {
-      throw new ApiError("Merchant not found for this shop.", 404);
-    }
+    if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);
 
     const merchantId = merchant.id;
     merchantdetails = merchant;
     accessToken = merchant.shopifyAccessToken;
 
-    // getting the course details
+    // course details
     const { title, description, price } = req.body;
-
     if (!title || !description || !price) {
-      throw new ApiError("All fields Are Required", 422);
+      throw new ApiError("All fields are required", 422);
     }
 
-    // Sanitize the filename
+    // sanitize + upload thumbnail
     const sanitizedFilename = thumbnail.originalname.replace(/\s+/g, "-");
     const extension = path.extname(sanitizedFilename);
     const baseName = path.basename(sanitizedFilename, extension);
     const uniqueFilename = `${baseName}-${Date.now()}${extension}`;
-
-    // Final destination
     const destination = `Coursethumbnails/${uniqueFilename}`;
 
-    // Upload to Bunny
     const result = await uploadToBunnyStorage(thumbnail.filename, destination);
     if (!result.success) {
-      throw new ApiError(`thumbnail upload failed ->${result.error}`, 422);
+      throw new ApiError(`Thumbnail upload failed -> ${result.error}`, 422);
     }
     thumbnailpath = destination;
+    const thumbnailUrl = getBunnyPublicUrl(destination);
 
-    // getting the thumbnail url
-    thumbnailUrl = getBunnyPublicUrl(destination);
-
-    // 1. Create product in Shopify
+    // 1. Shopify product
     const productPayload = {
       product: {
         title,
         body_html: description,
-        // images: thumbnail ? [{ src: thumbnail }] : [],
         images: thumbnailUrl ? [{ src: thumbnailUrl }] : [],
         variants: [
           {
-            price: price ? price.toString() : "0.00",
+            price: price.toString(),
             inventory_management: "shopify",
             inventory_policy: "deny",
             fulfillment_service: "manual",
@@ -117,6 +282,7 @@ export const createCourse = async (req, res, next) => {
         ],
       },
     };
+
     const shopifyRes = await fetch(
       `https://${shopDomain}/admin/api/2023-10/products.json`,
       {
@@ -131,73 +297,76 @@ export const createCourse = async (req, res, next) => {
     const shopifyData = await shopifyRes.json();
 
     if (!shopifyRes.ok || !shopifyData.product) {
-      throw new ApiError("Failed to create Shopify product", 500);
+      console.error("❌ Shopify product creation failed:", shopifyData);
+      throw new ApiError(
+        shopifyData.errors || "Failed to create Shopify product",
+        500
+      );
     }
-    // getting the shopify product id
-    const shopifyProductId = shopifyData.product.id;
+
     shopify_Product_Id = shopifyData.product.id;
     const shopifyHandle = shopifyData.product.handle;
 
-    // Creating A Collection of the course
-    let collectionId = await createCollection({
+    // 2. Bunny collection
+    const collectionId = await createCollection({
       LibraryId: merchant?.StreamLibraryId || LibId,
       apiKey: merchant?.StreamApiKEY || StreamApiKEY,
       name: slug(title),
     });
     bunny_collection_id = collectionId?.guid;
 
-    // 2. Create course in DB, linked to Shopify product
+    // 3. Save in DB
     const course = await Course.create({
       title,
       description,
       thumbnail: thumbnailUrl,
-      shopifyProductId,
+      shopifyProductId: shopify_Product_Id,
       shopifyHandle,
       price,
       thumbnailDestinationPath: thumbnailpath,
       merchantId,
       collectionid: collectionId?.guid,
-      // thumbnailprovider: "bunny",
     });
-
     db_course_id = course.id;
 
-    // return the response
     res.status(201).json({
       success: true,
       data: { course, shopifyProduct: shopifyData.product },
     });
   } catch (error) {
-    // delete the thumbnail from Bunny Storage
-    if (thumbnailpath) {
-      await deleteBunnyStorageFile(thumbnailpath);
-    }
+    console.error("❌ createCourse Error:", {
+      message: error.message,
+      stack: error.stack,
+      status: error.status,
+      shopDomain,
+      shopify_Product_Id,
+      db_course_id,
+      bunny_collection_id,
+    });
 
-    // delete the shopify product
-    if (shopify_Product_Id) {
-      await deleteShopifyProduct(shopDomain, accessToken, shopify_Product_Id);
-    }
-
-    // delete the course collection
-    if (bunny_collection_id) {
-      await deleteStreamCollection({
-        LibraryId: merchantdetails?.StreamLibraryId || LibId,
-        collectionId: bunny_collection_id,
-        apiKey: merchantdetails?.StreamApiKEY || StreamApiKEY,
-      });
-    }
-    if (db_course_id) {
-      try {
-        await Course.destroy({ where: { id: db_course_id } });
-      } catch (error) {
-        console.warn(" Failed to delete course from the DB", error.message);
+    // cleanup
+    try {
+      if (thumbnailpath) await deleteBunnyStorageFile(thumbnailpath);
+      if (shopify_Product_Id)
+        await deleteShopifyProduct(shopDomain, accessToken, shopify_Product_Id);
+      if (bunny_collection_id) {
+        await deleteStreamCollection({
+          LibraryId: merchantdetails?.StreamLibraryId || LibId,
+          collectionId: bunny_collection_id,
+          apiKey: merchantdetails?.StreamApiKEY || StreamApiKEY,
+        });
       }
+      if (db_course_id) await Course.destroy({ where: { id: db_course_id } });
+    } catch (cleanupError) {
+      console.warn("⚠️ Cleanup failed:", cleanupError.message);
     }
 
     return next(
       new ApiError(
-        error?.message || "Something went wrong",
-        error?.status || 500
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+        error.status || 500
       )
     );
   } finally {
@@ -205,11 +374,12 @@ export const createCourse = async (req, res, next) => {
       try {
         await fs2.unlink(path.join("uploads", thumbnaillocalfile));
       } catch (err) {
-        console.warn(" Failed to delete thumbnail from the local", err.message);
+        console.warn("⚠️ Failed to delete local thumbnail:", err.message);
       }
     }
   }
 };
+
 
 // Get all courses
 export const getCourses = async (req, res, next) => {
