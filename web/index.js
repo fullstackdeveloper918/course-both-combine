@@ -53,11 +53,7 @@ const __dirname = join(__filename, "..");
 
 const app = express();
 app.use(cors());
-// app.use(cors({
-//   origin: "*",
-//   methods: "*",
-//   allowedHeaders: "*"
-// }));
+
 app.use(express.urlencoded({ extended: true, limit: "800mb" }));
 // app.use(express.static("./uploads"));
 // parse application/json
