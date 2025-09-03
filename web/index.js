@@ -32,7 +32,7 @@ import progressRoutes from "./routes/progressRoutes.js";
 import { errorHandler } from "./utils/ApiUtilis.js";
 import { DownloadCourseContent } from "./controllers/courseController.js";
 import Lesson from "./models/Lesson.js";
-import { where } from "sequelize";
+// import { where } from "sequelize";
 import Course from "./models/Course.js";
 import {
   createCollection,
