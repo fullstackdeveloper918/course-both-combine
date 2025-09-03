@@ -16,13 +16,13 @@ export const app = {
 // };
 export const database = {
   //logging: process.env.DB_LOGGING === "true",
-  host: "srv1331.hstgr.io",
+  host: "193.203.184.57",
   port: 3306,
   name: "u448961291_courses",
   user: "u448961291_courses",
   password: "5Zd^f*Xw",
 };
-// console.log("");
+
 
 // export const database = {
 //   logging: process.env.DB_LOGGING === "true",
