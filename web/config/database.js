@@ -11,7 +11,7 @@ const sequelize = new Sequelize(
     dialect: 'mysql',
     logging: database.logging ? console.log : false,
     define: { timestamps: true, underscored: true },
-    pool: { max: 5, min: 0, acquire: 60000, idle: 10000 }, // give more time to obtain a connection [14]
+    pool: { max: 1, min: 0, acquire: 60000, idle: 10000 }, // give more time to obtain a connection [14]
     dialectOptions: {
       connectTimeout: 30000,           // ms to establish the initial TCP connection [2][3]
       // ssl: {
