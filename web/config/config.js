@@ -22,6 +22,7 @@ export const database = {
   user: "u448961291_course_platf",
   password: "Course@platfor123",
 };
+// console.log("");
 
 // export const database = {
 //   logging: process.env.DB_LOGGING === "true",
