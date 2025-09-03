@@ -18,9 +18,9 @@ export const database = {
   //logging: process.env.DB_LOGGING === "true",
   host: "srv1331.hstgr.io",
   port: 3306,
-  name: "u448961291_course_platfor",
-  user: "u448961291_course_platfor",
-  password: "Course@platfor123",
+  name: "u448961291_courses",
+  user: "u448961291_courses",
+  password: "5Zd^f*Xw",
 };
 // console.log("");
 
