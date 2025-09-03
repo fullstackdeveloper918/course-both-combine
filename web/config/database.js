@@ -6,20 +6,18 @@ const sequelize = new Sequelize(
   database.user,
   database.password,
   {
-    host: database.host,                // must be an external hostname/IP in Render, never 127.0.0.1 [13]
+    host: database.host, // e.g. "mysql-xxxxx.render.com"
     port: database.port ?? 3306,
     dialect: 'mysql',
     logging: database.logging ? console.log : false,
     define: { timestamps: true, underscored: true },
-    pool: { max: 1, min: 0, acquire: 60000, idle: 10000 }, // give more time to obtain a connection [14]
+    pool: { max: 5, min: 0, acquire: 60000, idle: 10000 },
     dialectOptions: {
-      connectTimeout: 30000,           // ms to establish the initial TCP connection [2][3]
-      // ssl: {
-      //   ca: process.env.MYSQL_CA,    // if provider requires SSL, provide CA/cert/key here
-      //   cert: process.env.MYSQL_CERT,
-      //   key: process.env.MYSQL_KEY,
-      //   rejectUnauthorized: true     // avoid setting false unless only for temporary tests [6]
-      // }
+      connectTimeout: 30000,
+      ssl: {
+        require: true,
+        rejectUnauthorized: false, // temporary; if Render provides CA cert, replace with that
+      },
     },
   }
 );
