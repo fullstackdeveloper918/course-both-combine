@@ -211,6 +211,7 @@ app.post("/api/products/create", async (req, res) => {
     }
 
     // get the product price
+    // commment
 
     let price = variants[0].price;
     // get the product image
