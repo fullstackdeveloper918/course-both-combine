@@ -32,7 +32,7 @@ File.init(
     },
     lessonId: {
       type: DataTypes.UUID,
-      allowNull: true,
+      // allowNull: true,
       references: {
         model: "lessons",
         key: "id",
@@ -40,7 +40,7 @@ File.init(
     },
     courseId: {
       type: DataTypes.UUID,
-      allowNull: true,
+      // allowNull: true,
       references: {
         model: "courses",
         key: "id",

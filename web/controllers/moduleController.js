@@ -6,6 +6,11 @@ import fs from "fs";
 import csv from "csvtojson";
 import { Op, Sequelize } from "sequelize";
 import { ApiError } from "../utils/ApiUtilis.js";
+import {
+  deleteBunnyStorageFile,
+  deleteBunnyVideo,
+} from "../utils/bunnyUtilis.js";
+import fs2 from "fs/promises";
 
 // Create a new module
 // Create a new module
@@ -209,7 +214,7 @@ export const getModule = async (req, res) => {
 // Update module
 export const updateModule = async (req, res) => {
   try {
-    const { title, description, order } = req.body;
+    let { title, description, order } = req.body;
 
     if (!title || !description || order === undefined) {
       return res.status(400).json({
@@ -229,6 +234,9 @@ export const updateModule = async (req, res) => {
     }
 
     // Only proceed if the order is actually changing
+    console.log("order..", order);
+    console.log("module.order..", module.order);
+
     if (module.order !== order) {
       // Find all modules in the course, excluding the current one
       const modules = await Module.findAll({
@@ -262,6 +270,8 @@ export const updateModule = async (req, res) => {
       }
     }
 
+    console.log("module updated order..", order);
+
     // Update the module itself
     await module.update({
       title,
@@ -282,9 +292,24 @@ export const updateModule = async (req, res) => {
 };
 
 // delete the module
+
 export const deleteModule = async (req, res) => {
   try {
-    const module = await Module.findByPk(req.params.id);
+    const module = await Module.findOne({
+      where: { id: req.params.id },
+      include: [
+        {
+          model: Lesson,
+          as: "lessons",
+          include: [
+            {
+              model: File,
+              as: "files",
+            },
+          ],
+        },
+      ],
+    });
 
     if (!module) {
       return res.status(404).json({
@@ -293,13 +318,30 @@ export const deleteModule = async (req, res) => {
       });
     }
 
+    // Delete lesson files, thumbnails, and videos
+    for (const lesson of module.lessons || []) {
+      for (const file of lesson.files || []) {
+        if (file.destinationPath) {
+          await deleteBunnyStorageFile(file.destinationPath);
+        }
+        await file.destroy();
+      }
+      if (lesson.thumbnailDestinationPath) {
+        await deleteBunnyStorageFile(lesson.thumbnailDestinationPath);
+      }
+      if (lesson.videoId) {
+        await deleteBunnyVideo(lesson.videoId);
+      }
+      await lesson.destroy();
+    }
+
     const deletedOrder = module.order;
     const courseId = module.courseId;
 
-    // Delete the module
+    // Delete the module after cleaning up resources
     await module.destroy();
 
-    // Shift orders of subsequent modules down by 1
+    // Shift order of subsequent modules
     await Module.update(
       { order: Sequelize.literal("`order` - 1") },
       {
@@ -312,7 +354,7 @@ export const deleteModule = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {},
+      message: "Module deleted successfully",
     });
   } catch (error) {
     res.status(500).json({
@@ -321,6 +363,60 @@ export const deleteModule = async (req, res) => {
     });
   }
 };
+
+// export const deleteModule = async (req, res) => {
+//   try {
+//     const module = await Module.findOne({
+//       where: { id: req.params.id },
+//       include: [
+//         {
+//           model: Lesson,
+//           as: "lessons",
+//           include: [
+//             {
+//               model: File,
+//               as: "files",
+//             },
+//           ],
+//         },
+//       ],
+//     });
+
+//     if (!module) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Module not found",
+//       });
+//     }
+
+//     const deletedOrder = module.order;
+//     const courseId = module.courseId;
+
+//     // Delete the module
+//     await module.destroy();
+
+//     // Shift orders of subsequent modules down by 1
+//     await Module.update(
+//       { order: Sequelize.literal("`order` - 1") },
+//       {
+//         where: {
+//           courseId: courseId,
+//           order: { [Op.gt]: deletedOrder },
+//         },
+//       }
+//     );
+
+//     res.status(200).json({
+//       success: true,
+//       data: {},
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message,
+//     });
+//   }
+// };
 
 // Reorder modules
 export const reorderModules = async (req, res) => {
@@ -414,119 +510,314 @@ export const exportModules = async (req, res) => {
 
 // csv bulk Upload
 
+// export const CreateModulesFromcsv = async (req, res) => {
+//   let localFilePath;
+//   try {
+//     const { courseId } = req.body;
+
+//     if (!req.file) throw new ApiError("Please upload a CSV file", 400);
+//     localFilePath = req.file.path;
+
+//     if (!courseId) throw new ApiError("Course ID is required", 400);
+
+//     // Convert CSV to JSON
+//     let modulesData;
+//     try {
+//       modulesData = await csv().fromFile(localFilePath);
+//     } catch (error) {
+//       throw new ApiError("Invalid CSV format", 400);
+//       // console.log(error);
+//     }
+//     // Clean and parse order values; assign 0 to invalid or missing
+//     modulesData = modulesData.map((mod) => {
+//       return {
+//         title: mod.title || "default title",
+//         description: mod.description || "default description",
+//         order: parseInt(mod.order, 10) || 0,
+//       };
+//     });
+
+//     // Sort modules by their assigned order, those with 0 orders go last
+//     modulesData.sort((a, b) => {
+//       if (a.order === 0) return 1;
+//       if (b.order === 0) return -1;
+//       return a.order - b.order;
+//     });
+
+//     // Fetch existing modules orders for the course
+//     const existingModules = await Module.findAll({
+//       where: { courseId },
+//       order: [["order", "ASC"]],
+//     });
+
+//     // Get max current order in DB
+//     let maxExistingOrder = existingModules.length
+//       ? existingModules[existingModules.length - 1].order
+//       : 0;
+
+//     // Prepare combined order sequence:
+//     // Re-assign orders in modulesData starting at 1 if no existing
+//     // or at maxExistingOrder + 1 if existing modules present
+//     let startOrder = maxExistingOrder + 1;
+//     let nextOrder = startOrder;
+
+//     for (let i = 0; i < modulesData.length; i++) {
+//       // If order is less than or equal to maxExistingOrder,
+//       // we must shift existing modules' orders to make room.
+//       if (
+//         modulesData[i].order > 0 &&
+//         modulesData[i].order <= maxExistingOrder
+//       ) {
+//         // Shift existing modules with order >= this order by +1
+//         await Module.increment(
+//           { order: 1 },
+//           {
+//             where: {
+//               courseId,
+//               order: { [Op.gte]: modulesData[i].order },
+//             },
+//           }
+//         );
+
+//         maxExistingOrder++; // Update max after shift
+//         modulesData[i].order = modulesData[i].order; // Keep original order
+//       } else if (modulesData[i].order === 0) {
+//         // Assign next available order
+//         modulesData[i].order = nextOrder++;
+//       } else if (modulesData[i].order > maxExistingOrder) {
+//         // Accept order if larger than maxExistingOrder
+//         nextOrder = modulesData[i].order + 1;
+//       }
+//     }
+
+//     // Now ensure the orders in modulesData are unique & sequential
+//     // Sort modulesData again by order
+//     modulesData.sort((a, b) => a.order - b.order);
+
+//     // Fix any potential gaps or duplicates by reassigning orders sequentially
+//     let lastOrder = 0;
+//     for (let mod of modulesData) {
+//       if (mod.order <= lastOrder) {
+//         mod.order = lastOrder + 1;
+//       }
+//       lastOrder = mod.order;
+//     }
+
+//     // Create modules in DB
+//     const createdModules = [];
+//     for (const moduleData of modulesData) {
+//       const module = await Module.create({
+//         title: moduleData.title,
+//         description: moduleData.description,
+//         order: moduleData.order,
+//         courseId,
+//       });
+//       createdModules.push(module);
+//     }
+
+//     fs.unlinkSync(localFilePath);
+
+//     res.status(200).json({
+//       success: true,
+//       message: `${createdModules.length} modules imported successfully`,
+//       data: createdModules,
+//     });
+//   } catch (error) {
+//     if (localFilePath && fs.existsSync(localFilePath)) {
+//       fs.unlinkSync(localFilePath);
+//     }
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
 export const CreateModulesFromcsv = async (req, res) => {
   let localFilePath;
   try {
     const { courseId } = req.body;
-
     if (!req.file) throw new ApiError("Please upload a CSV file", 400);
-    localFilePath = req.file.path;
+        localFilePath = req.file.path;
 
     if (!courseId) throw new ApiError("Course ID is required", 400);
 
-    // Convert CSV to JSON
-    let modulesData = await csv().fromFile(localFilePath);
-    // Clean and parse order values; assign 0 to invalid or missing
-    modulesData = modulesData.map((mod) => {
-      return {
-        title: mod.title || "default title",
-        description: mod.description || "default description",
-        order: parseInt(mod.order, 10) || 0,
-      };
-    });
 
-    // Sort modules by their assigned order, those with 0 orders go last
-    modulesData.sort((a, b) => {
-      if (a.order === 0) return 1;
-      if (b.order === 0) return -1;
-      return a.order - b.order;
-    });
+    // ✅ Ensure course exists
+    const course = await Course.findByPk(courseId);
+    if (!course) throw new ApiError("Course not found", 404);
 
-    // Fetch existing modules orders for the course
-    const existingModules = await Module.findAll({
-      where: { courseId },
-      order: [["order", "ASC"]],
-    });
-
-    // Get max current order in DB
-    let maxExistingOrder = existingModules.length
-      ? existingModules[existingModules.length - 1].order
-      : 0;
-
-    // Prepare combined order sequence:
-    // Re-assign orders in modulesData starting at 1 if no existing
-    // or at maxExistingOrder + 1 if existing modules present
-    let startOrder = maxExistingOrder + 1;
-    let nextOrder = startOrder;
-
-    for (let i = 0; i < modulesData.length; i++) {
-      // If order is less than or equal to maxExistingOrder,
-      // we must shift existing modules' orders to make room.
-      if (
-        modulesData[i].order > 0 &&
-        modulesData[i].order <= maxExistingOrder
-      ) {
-        // Shift existing modules with order >= this order by +1
-        await Module.increment(
-          { order: 1 },
-          {
-            where: {
-              courseId,
-              order: { [Op.gte]: modulesData[i].order },
-            },
-          }
-        );
-
-        maxExistingOrder++; // Update max after shift
-        modulesData[i].order = modulesData[i].order; // Keep original order
-      } else if (modulesData[i].order === 0) {
-        // Assign next available order
-        modulesData[i].order = nextOrder++;
-      } else if (modulesData[i].order > maxExistingOrder) {
-        // Accept order if larger than maxExistingOrder
-        nextOrder = modulesData[i].order + 1;
-      }
+    // ✅ Parse CSV
+    let modulesData;
+    try {
+      modulesData = await csv().fromFile(localFilePath);
+    } catch (err) {
+      throw new ApiError("Invalid CSV format", 400);
     }
 
-    // Now ensure the orders in modulesData are unique & sequential
-    // Sort modulesData again by order
-    modulesData.sort((a, b) => a.order - b.order);
+    // ✅ Normalize input
+    modulesData = modulesData.map((mod) => ({
+      title: (mod.title || "Default Title").trim(),
+      description: (mod.description || "Default Description").trim(),
+      order: parseInt(mod.order, 10),
+    }));
 
-    // Fix any potential gaps or duplicates by reassigning orders sequentially
-    let lastOrder = 0;
+    console.log("modulesData", modulesData);
+    // ✅ Get current highest order in DB
+    const maxExistingOrder = await Module.max("order", { where: { courseId } });
+    let currentOrder = isNaN(maxExistingOrder) ? 0 : maxExistingOrder;
+
+    // ✅ Clean & normalize orders
+    const sanitized = [];
     for (let mod of modulesData) {
-      if (mod.order <= lastOrder) {
-        mod.order = lastOrder + 1;
+      let desiredOrder = mod.order;
+
+      if (!desiredOrder || isNaN(desiredOrder) || desiredOrder < 1) {
+        desiredOrder = currentOrder + 1;
+      } else if (desiredOrder > currentOrder + 1) {
+        desiredOrder = currentOrder + 1;
       }
-      lastOrder = mod.order;
+
+      // If duplicate order, bump it up
+      while (sanitized.some((m) => m.order === desiredOrder)) {
+        desiredOrder++;
+      }
+
+      sanitized.push({
+        ...mod,
+        order: desiredOrder,
+      });
+
+      currentOrder = Math.max(currentOrder, desiredOrder);
     }
 
-    // Create modules in DB
+    // ✅ Insert into DB with shifting logic
     const createdModules = [];
-    for (const moduleData of modulesData) {
+    for (let mod of sanitized) {
+      await Module.increment(
+        { order: 1 },
+        {
+          where: {
+            courseId,
+            order: { [Op.gte]: mod.order },
+          },
+        }
+      );
+
       const module = await Module.create({
-        title: moduleData.title,
-        description: moduleData.description,
-        order: moduleData.order,
+        title: mod.title,
+        description: mod.description,
+        order: mod.order,
         courseId,
       });
       createdModules.push(module);
     }
 
-    fs.unlinkSync(localFilePath);
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: `${createdModules.length} modules imported successfully`,
       data: createdModules,
     });
   } catch (error) {
-    if (localFilePath && fs.existsSync(localFilePath)) {
-      fs.unlinkSync(localFilePath);
+    console.error("Bulk module upload error:", error);
+    return res
+      .status(error.statusCode || 500)
+      .json({ success: false, error: error.message });
+  } finally {
+    if (localFilePath) {
+      try {
+        await fs2.unlink(localFilePath);
+      } catch (err) {
+        console.warn("Failed to delete temp CSV:", err.message);
+      }
     }
-    res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// export const CreateModulesFromcsv = async (req, res) => {
+//   let localFilePath;
+//   try {
+//     const { courseId } = req.body;
+//     if (!req.file) throw new ApiError("Please upload a CSV file", 400);
+//     if (!courseId) throw new ApiError("Course ID is required", 400);
+
+//     localFilePath = req.file.path;
+
+//     // ✅ Ensure course exists
+//     const course = await Course.findByPk(courseId);
+//     if (!course) throw new ApiError("Course not found", 404);
+
+//     // ✅ Parse CSV
+//     let modulesData;
+//     try {
+//       modulesData = await csv().fromFile(localFilePath);
+//     } catch (err) {
+//       throw new ApiError("Invalid CSV format", 400);
+//     }
+
+//     // ✅ Normalize module data
+//     modulesData = modulesData.map((mod) => ({
+//       title: (mod.title || "Default Title").trim(),
+//       description: (mod.description || "Default Description").trim(),
+//       order: parseInt(mod.order, 10),
+//     }));
+
+//     const createdModules = [];
+
+//     // ✅ Process each row using same rules as single createModule
+//     for (let mod of modulesData) {
+//       const moduleCount = await Module.count({ where: { courseId } });
+
+//       let finalOrder;
+
+//       if (moduleCount === 0) {
+//         finalOrder = 1;
+//       } else if (!mod.order || isNaN(mod.order) || mod.order < 1) {
+//         finalOrder = moduleCount + 1;
+//       } else if (mod.order > moduleCount + 1) {
+//         finalOrder = moduleCount + 1;
+//       } else {
+//         finalOrder = mod.order;
+
+//         // Shift existing modules >= finalOrder
+//         await Module.increment(
+//           { order: 1 },
+//           {
+//             where: {
+//               courseId,
+//               order: { [Op.gte]: finalOrder },
+//             },
+//           }
+//         );
+//       }
+
+//       const module = await Module.create({
+//         title: mod.title,
+//         description: mod.description,
+//         order: finalOrder,
+//         courseId,
+//       });
+
+//       createdModules.push(module);
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: `${createdModules.length} modules imported successfully`,
+//       data: createdModules,
+//     });
+//   } catch (error) {
+//     console.error("Bulk module upload error:", error);
+//     return res
+//       .status(error.statusCode || 500)
+//       .json({ success: false, error: error.message });
+//   } finally {
+//     if (localFilePath) {
+//       try {
+//         await fs2.unlink(localFilePath);
+//       } catch (err) {
+//         console.warn("Failed to delete temp CSV:", err.message);
+//       }
+//     }
+//   }
+// };
 
 // export const CreateModulesFromcsv = async (req, res) => {
 //   let localfilepath;

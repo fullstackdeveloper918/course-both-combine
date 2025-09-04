@@ -6,7 +6,7 @@ import {
   Progress,
   Merchant,
 } from "../models/associations.js";
-import { Op, where } from "sequelize";
+import { Op, Sequelize, where } from "sequelize";
 import jwt from "jsonwebtoken";
 import {
   uploadToStorage,
@@ -36,6 +36,7 @@ import axios from "axios";
 import fs2 from "fs/promises";
 import { BulkUploadWorker } from "../worker/bulkUploadWorker.js";
 import { ApiError } from "../utils/ApiUtilis.js";
+import { log } from "console";
 
 const upload = multer({ dest: "uploads/" });
 
@@ -322,17 +323,7 @@ export const createLesson = async (req, res) => {
 
     // Session & shop domain extraction
     const session = res.locals.shopify?.session || req.session;
-    let shopDomain;
-    // if (process.env.NODE_ENV === "development") {
-    //   shopDomain = process.env.TEST_DOMAIN;
-    // } else if (session && session.shop) {
-    //   shopDomain = session.shop;
-    // } else {
-    //   return res
-    //     .status(401)
-    //     .json({ error: "Unauthorized: No valid Shopify session." });
-    // }
-    shopDomain = session.shop;
+    let shopDomain = session.shop;
 
     // Find merchant
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
@@ -409,8 +400,10 @@ export const createLesson = async (req, res) => {
           );
         }
         bunnyStoragePaths.push(destPath);
+        let url = getBunnyPublicUrl(destPath);
+
         fileUrls.push({
-          url: getBunnyPublicUrl(destPath),
+          url,
           destPath,
           mimeType: file?.mimetype || file?.contentType,
           size: file?.size || 0,
@@ -420,21 +413,15 @@ export const createLesson = async (req, res) => {
       }
     }
 
-    // Get video processing info and duration from Bunny Stream API
-    const videoInfo = await waitForVideoProcessing({ videoGuid, maxTries: 10 });
-    let videoDuration = 0;
-    if (videoInfo.success) {
-      videoDuration = videoInfo.data.length;
-    }
-
     // Determine lesson order and shift others if needed
     const lessonCount = await Lesson.count({ where: { courseId, moduleId } });
 
     let order = inputOrder;
+    console.log("order input", order);
 
     if (lessonCount === 0) {
       order = 1;
-    } else if (!order || order <= 0) {
+    } else if (!order || isNaN(order) || order < 1) {
       order = lessonCount + 1;
     } else if (order > lessonCount + 1) {
       order = lessonCount + 1;
@@ -452,24 +439,12 @@ export const createLesson = async (req, res) => {
       );
     }
 
-    // const lessonCount = await Lesson.count({ where: { courseId, moduleId } });
-    // let order = inputOrder;
-    // if (lessonCount === 0) {
-    //   order = 1;
-    // } else if (!order || order <= 0) {
-    //   order = lessonCount + 1;
-    // } else {
-    //   const afterLessons = await Lesson.findAll({
-    //     where: { courseId, moduleId, order: { [Op.gte]: order } },
-    //     order: [["order", "ASC"]],
-    //   });
-    //   for (const les of afterLessons) {
-    //     await Lesson.update(
-    //       { order: les.order + 1 },
-    //       { where: { id: les.id } }
-    //     );
-    //   }
-    // }
+    // Get video processing info and duration from Bunny Stream API
+    const videoInfo = await waitForVideoProcessing({ videoGuid, maxTries: 4 });
+    let videoDuration = 0;
+    if (videoInfo.success) {
+      videoDuration = videoInfo.data.length;
+    }
 
     // Create lesson record
     const lesson = await Lesson.create({
@@ -493,22 +468,43 @@ export const createLesson = async (req, res) => {
     if (!lesson) throw new ApiError("Failed to create lesson.", 500);
     lessonId = lesson.id;
 
-    // Update total lesson counts for course and module
-    const totalLessonCount = await Lesson.count({
-      where: { courseId, deleteFlag: false },
-    });
-    await Course.update(
-      { totalLessons: totalLessonCount },
-      { where: { id: courseId } }
-    );
+    if (videoDuration <= 0) {
+      const videoInfo = await waitForVideoProcessing({
+        videoGuid,
+        maxTries: 2,
+      });
+      let videoDurationres = 0;
+      if (videoInfo.success) {
+        videoDurationres = videoInfo.data.length;
+      }
+      if (videoDurationres > 0) {
+        try {
+          await Lesson.update(
+            { duration: videoDurationres, processingStatus: "completed" },
+            { where: { id: lessonId } }
+          );
+        } catch (error) {
+          console.warn(`Failed to update lesson duration: ${error}`);
+        }
+      }
+    }
 
-    const totalModuleLessonCount = await Lesson.count({
-      where: { courseId, moduleId, deleteFlag: false },
-    });
-    await Module.update(
-      { totalLessons: totalModuleLessonCount },
-      { where: { id: moduleId } }
-    );
+    // Update total lesson counts for course and module
+    // const totalLessonCount = await Lesson.count({
+    //   where: { courseId, deleteFlag: false },
+    // });
+    // await Course.update(
+    //   { totalLessons: totalLessonCount },
+    //   { where: { id: courseId } }
+    // );
+
+    // const totalModuleLessonCount = await Lesson.count({
+    //   where: { courseId, moduleId, deleteFlag: false },
+    // });
+    // await Module.update(
+    //   { totalLessons: totalModuleLessonCount },
+    //   { where: { id: moduleId } }
+    // );
 
     // Create File records for supporting files
     for (let i = 0; i < fileUrls.length; i++) {
@@ -517,7 +513,7 @@ export const createLesson = async (req, res) => {
         url: fileData.url,
         mimeType: fileData?.mimeType || "",
         lessonId: lesson.id,
-        courseId,
+        courseId: courseId,
         destinationPath: fileData?.destPath,
         size: fileData?.size || 0,
       });
@@ -589,17 +585,7 @@ export const createBunnyTusUpload = async (req, res) => {
 
     // Session & shop domain extraction
     const session = res.locals.shopify?.session || req.session;
-    let shopDomain;
-    // if (process.env.NODE_ENV === "development") {
-    //   shopDomain = process.env.TEST_DOMAIN;
-    // } else if (session && session.shop) {
-    //   shopDomain = session.shop;
-    // } else {
-    //   return res
-    //     .status(401)
-    //     .json({ error: "Unauthorized: No valid Shopify session." });
-    // }
-    shopDomain = session.shop;
+    let shopDomain = session.shop;
 
     if (!courseId || !moduleId) {
       throw new ApiError("Course ID and Module ID are required", 400);
@@ -1787,18 +1773,13 @@ export const getLessons = async (req, res) => {
 export const getLesson = async (req, res) => {
   try {
     const session = res.locals.shopify?.session || req.session;
-    let shopDomain;
+ 
 
-    // if (process.env.NODE_ENV === "development") {
-    //   shopDomain = process.env.TEST_DOMAIN;
-    // } else if (session && session.shop) {
-    //   shopDomain = session.shop;
-    // } else {
-    //   return res
-    //     .status(401)
-    //     .json({ error: "Unauthorized: No valid Shopify session." });
-    // }
-    shopDomain = session.shop;
+  
+    let  shopDomain = session.shop;
+
+    if(!shopDomain)throw new ApiError("Unauthorized: No valid Shopify session.", 401);
+
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
 
     if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);
@@ -1941,6 +1922,62 @@ export const updateLesson = async (req, res) => {
 };
 
 // Delete lesson
+// export const deleteLesson = async (req, res) => {
+//   try {
+//     const lesson = await Lesson.findByPk(req.params.id, {
+//       include: [
+//         {
+//           model: File,
+//           as: "files",
+//         },
+//       ],
+//     });
+
+//     if (!lesson) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Lesson not found",
+//       });
+//     }
+
+//     const currentTime = new Date();
+
+//     // Soft delete associated files
+//     for (const file of lesson.files) {
+//       await file.update({
+//         deleteFlag: true,
+//         deletedAt: currentTime,
+//       });
+
+//       // Optional: remove file from storage
+//       // await deleteFromStorage(file.key);
+//     }
+
+//     // Soft delete the lesson
+//     await lesson.update({
+//       deleteFlag: true,
+//       deletedAt: currentTime,
+//     });
+
+//     const TotalLessonCount = await Lesson.count({
+//       where: { courseId: lesson?.courseId, deleteFlag: false },
+//     });
+
+//     await Course.update(
+//       { totalLessons: TotalLessonCount },
+//       { where: { id: lesson.courseId } }
+//     );
+//     res.status(200).json({
+//       success: true,
+//       message: "Lesson and associated files soft deleted successfully",
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message,
+//     });
+//   }
+// };
 export const deleteLesson = async (req, res) => {
   try {
     const lesson = await Lesson.findByPk(req.params.id, {
@@ -1959,36 +1996,60 @@ export const deleteLesson = async (req, res) => {
       });
     }
 
-    const currentTime = new Date();
-
-    // Soft delete associated files
-    for (const file of lesson.files) {
-      await file.update({
-        deleteFlag: true,
-        deletedAt: currentTime,
-      });
-
-      // Optional: remove file from storage
-      // await deleteFromStorage(file.key);
+    // Delete associated files from storage and database
+    for (const file of lesson.files || []) {
+      if (file.destinationPath) {
+        await deleteBunnyStorageFile(file.destinationPath);
+      }
+      await file.destroy();
     }
 
-    // Soft delete the lesson
-    await lesson.update({
-      deleteFlag: true,
-      deletedAt: currentTime,
-    });
+    // Cleanup lesson thumbnails/videos
+    if (lesson.thumbnailDestinationPath) {
+      await deleteBunnyStorageFile(lesson.thumbnailDestinationPath);
+    }
 
-    const TotalLessonCount = await Lesson.count({
-      where: { courseId: lesson?.courseId, deleteFlag: false },
-    });
+    if (lesson.videoId) {
+      await deleteBunnyVideo(lesson.videoId);
+    }
 
-    await Course.update(
-      { totalLessons: TotalLessonCount },
-      { where: { id: lesson.courseId } }
+    // Store the deleted lesson order for reordering
+    const deletedOrder = lesson.order;
+    const courseId = lesson.courseId;
+    const moduleId = lesson.moduleId;
+    console.log("delete id.", deletedOrder);
+    console.log("course id.", courseId);
+    console.log("module id.", moduleId);
+
+    // Delete the lesson record
+    await lesson.destroy();
+
+    // Shift orders of subsequent lessons down by 1
+    await Lesson.update(
+      { order: Sequelize.literal("`order` - 1") },
+      {
+        where: {
+          courseId: courseId,
+          moduleId: moduleId,
+          order: { [Op.gt]: deletedOrder },
+        },
+      }
     );
+
+    // Update course's totalLessons count after deletion
+    // const totalLessonCount = await Lesson.count({
+    //   where: { courseId: courseId },
+    // });
+
+    // await Course.update(
+    //   { totalLessons: totalLessonCount },
+    //   { where: { id: courseId } }
+    // );
+
     res.status(200).json({
       success: true,
-      message: "Lesson and associated files soft deleted successfully",
+      message:
+        "Lesson and associated files deleted successfully, and order updated",
     });
   } catch (error) {
     res.status(500).json({

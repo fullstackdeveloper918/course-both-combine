@@ -36,11 +36,16 @@ import Lesson from "./models/Lesson.js";
 import Course from "./models/Course.js";
 import {
   createCollection,
+  deleteBunnyStorageFile,
+  deleteBunnyVideo,
+  deleteStreamCollection,
   updateCollectionName,
   waitForVideoProcessing,
 } from "./utils/bunnyUtilis.js";
 import cors from "cors";
 import slug from "slug";
+import Module from "./models/Module.js";
+import File from "./models/File.js";
 
 // Load environment variables
 dotenv.config();
@@ -53,7 +58,11 @@ const __dirname = join(__filename, "..");
 
 const app = express();
 app.use(cors());
-
+// app.use(cors({
+//   origin: "*",
+//   methods: "*",
+//   allowedHeaders: "*"
+// }));
 app.use(express.urlencoded({ extended: true, limit: "800mb" }));
 // app.use(express.static("./uploads"));
 // parse application/json
@@ -172,7 +181,7 @@ const stripHtml = (html) => {
 
 app.post("/api/products/create", async (req, res) => {
   try {
-    const shop = req.headers["x-shopify-shop-domain"];
+    console.log("product create webhook received");
 
     const { id, title, vendor, status, variants, images } = req.body;
 
@@ -180,7 +189,7 @@ app.post("/api/products/create", async (req, res) => {
 
     if (!variants?.length) {
       console.warn("No variants found");
-      return;
+      return res.status(200).send({ message: "No variants found" });
     }
 
     // Check if the product is already created
@@ -189,25 +198,24 @@ app.post("/api/products/create", async (req, res) => {
     });
     if (existingProduct) {
       // console.warn("Product already created");
-      return;
+      return res.status(200).send({ message: "product already created" });
     }
     // get the product description
     const description = stripHtml(req.body.body_html); // ✅ plain text description
 
-    // console.log("merchant domain.....", `${vendor}.myshopify.com`);
-    let merchantsData = await Merchant.findAll();
+    // find the merchant
 
     const merchant = await Merchant.findOne({
-      where: { shopifyDomain: shop },
+      where: { shopifyDomain: `${vendor}.myshopify.com` },
     });
-    // merchant domain
+
     if (!merchant) {
-      console.warn("No merchant found... ");
-      return;
+      console.warn("No merchant found ");
+            return res.status(200).send({ message: "No merchant found" });
+
     }
 
     // get the product price
-    // commment
 
     let price = variants[0].price;
     // get the product image
@@ -265,15 +273,19 @@ app.post("/api/webhooks/customers/update", async (req, res) => {
   res.status(200).send({ message: "Webhook received" });
 });
 
+// update the product webhook
 app.post("/api/products/update", async (req, res) => {
   try {
+    console.log("product update webhook received");
+
     const { id, title, vendor, status, variants, images } = req.body;
 
     if (!id || !status || !title || !status || !vendor) return;
 
     if (!variants?.length) {
       console.warn("No variants  found");
-      return;
+            return res.status(200).send({ message: "No variants found" });
+
     }
 
     // // find the merchant
@@ -284,7 +296,7 @@ app.post("/api/products/update", async (req, res) => {
 
     if (!merchant) {
       console.warn("No merchant found ");
-      return;
+            return res.status(200).send({ message: "No merchant found" });
     }
     let merchantdetails = merchant.dataValues;
 
@@ -308,7 +320,8 @@ app.post("/api/products/update", async (req, res) => {
 
     if (!course) {
       console.warn("No course found ");
-      return;
+                  return res.status(200).send({ message: "No course found" });
+
     }
 
     let db_sync_updated_at_value = course.dataValues.sync_updated_at
@@ -323,7 +336,8 @@ app.post("/api/products/update", async (req, res) => {
         sync_updated_at_value?.getTime() === db_sync_updated_at_value?.getTime()
       ) {
         console.warn("No update found ");
-        return;
+     return res.status(200).send({ message: "No update found" });
+
       }
     }
 
@@ -347,6 +361,7 @@ app.post("/api/products/update", async (req, res) => {
       thumbnail = course.dataValues?.thumbnail;
       // thumbnailprovider = course.dataValues?.thumbnailprovider;
     }
+    let previustitle = course.dataValues?.title;
 
     await course.update({
       title,
@@ -358,24 +373,120 @@ app.post("/api/products/update", async (req, res) => {
       status: req.body?.status,
     });
 
-    // Update the bunny collection name
-    let collectionUpdateResponse = await updateCollectionName({
-      LibraryId: merchantdetails?.StreamLibraryId || LibId,
-      collectionId: course.dataValues.collectionid,
-      newName: slug(title),
-      apiKey: merchantdetails?.StreamApiKEY || StreamApiKEY,
-    });
+    if (previustitle !== title) {
+      // Update the bunny collection name
+      let collectionUpdateResponse = await updateCollectionName({
+        LibraryId: merchantdetails?.StreamLibraryId || LibId,
+        collectionId: course.dataValues.collectionid,
+        newName: slug(title),
+        apiKey: merchantdetails?.StreamApiKEY || StreamApiKEY,
+      });
 
-    if (!collectionUpdateResponse.success) {
-      console.warn(
-        `❌ Failed to update collection name ${collectionUpdateResponse?.error}`
-      );
+      if (!collectionUpdateResponse.success) {
+        console.warn(
+          `❌ Failed to update collection name ${collectionUpdateResponse?.error}`
+        );
+      }
     }
-
     res.status(200).send({ message: "Webhook received" });
   } catch (error) {
     console.log(error, "error....");
     res.status(500).send({ message: "Internal server error" });
+  }
+});
+
+// delete the product webhook
+app.post("/api/products/delete", async (req, res) => {
+  try {
+    console.log("delete product webhook received");
+
+    const { id } = req.body;
+
+    const course = await Course.findOne({
+      where: { shopifyProductId: id },
+      include: [
+        {
+          model: Module,
+          as: "modules",
+          include: [
+            {
+              model: Lesson,
+              as: "lessons",
+              include: [
+                {
+                  model: File,
+                  as: "files",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!course) {
+                  return res.status(200).send({ message: "No course found" });
+
+    }
+    let merchantdetails = await Merchant.findOne({
+      where: { id: course.merchantId },
+    });
+    if (!merchantdetails) {
+      console.log("Merchant not found for this course.");
+               return res.status(200).send({ message: "merchant not found for this course" });
+
+    }
+    console.log("merchantdetails", merchantdetails.id);
+
+    // Delete module, lesson files, thumbnails, and videos
+    for (const module of course.modules || []) {
+      for (const lesson of module.lessons || []) {
+        for (const file of lesson.files || []) {
+          if (file.destinationPath) {
+            await deleteBunnyStorageFile(file.destinationPath);
+          }
+          await file.destroy();
+        }
+
+        if (lesson.thumbnailDestinationPath) {
+          await deleteBunnyStorageFile(lesson.thumbnailDestinationPath);
+        }
+
+        if (lesson.videoId) {
+          await deleteBunnyVideo(lesson.videoId);
+        }
+        await lesson.destroy();
+      }
+      await module.destroy();
+    }
+
+    // Delete course thumbnail and collection
+    if (course.thumbnailDestinationPath) {
+      await deleteBunnyStorageFile(course.thumbnailDestinationPath);
+    }
+
+    if (course.collectionid) {
+      try {
+        await deleteStreamCollection({
+          LibraryId: merchantdetails.StreamLibraryId || LibId,
+          collectionId: course.collectionid,
+          apiKey: merchantdetails.StreamApiKEY || StreamApiKEY,
+        });
+        console.log("collection deleted successfully");
+      } catch (error) {
+        console.warn("Failed to delete course collection:", error.message);
+      }
+    }
+    // let courseid = course.id;
+
+    // Delete the course record from DB
+    await course.destroy();
+
+    console.log("product deleted successfully");
+
+    res.status(200).send({ message: "Product deleted successfully" });
+  } catch (error) {
+    res.status(500).send({ message: "Internal server error Deleting product" });
   }
 });
 
@@ -399,6 +510,9 @@ app.post("/api/BunnyStreamsWebhook", async (req, res) => {
   const { VideoLibraryId, VideoGuid, Status } = req.body;
 
   try {
+    console.log("runninng...", VideoGuid);
+    console.log("status", Status);
+
     if (Status === 3 || Status === 4) {
       const lesson = await Lesson.findOne({
         where: { videoId: VideoGuid },
@@ -413,8 +527,12 @@ app.post("/api/BunnyStreamsWebhook", async (req, res) => {
       if (!lesson) {
         return res
           .status(200)
-          .send({ message: "Lesson not found, webhook received" });
+          .json({ message: "Lesson not found, webhook received" });
       }
+
+      console.log("lesson found....");
+
+      // console.log("lesson data...", lesson?.merchant);
 
       const streamApiKey =
         lesson?.merchant?.streamApiKey || process.env.STREAM_API_KEY;
@@ -431,6 +549,7 @@ app.post("/api/BunnyStreamsWebhook", async (req, res) => {
           .status(200)
           .send({ message: "Video info missing, webhook received" });
       }
+      console.log("Updated the status....");
 
       await lesson.update({
         processingStatus: "completed",

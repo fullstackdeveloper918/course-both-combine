@@ -1,10 +1,10 @@
 // const Shopify = require('shopify-api-node');
 // const config = require('../config/config');
 // const { Course, CourseAccess, User } = require('../models/associations');
-import Shopify from 'shopify-api-node';
-import config from '../config/config.js';
-import { Course, CourseAccess, User } from '../models/associations.js';
 
+import config from '../config/config.js';
+import  shopify  from "shopify-api-node";
+import { Course, CourseAccess, User } from '../models/associations.js';
 // Initialize Shopify client
 const shopify = new Shopify({
   shopName: config.shopify.shopName,

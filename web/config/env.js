@@ -11,11 +11,8 @@ const config = {
     NODE_ENV: "production",
   },
 };
-
 // Get current environment
 const currentEnv = "production";
-
 // Export environment variables
 const env = config[currentEnv];
-
 export default env;

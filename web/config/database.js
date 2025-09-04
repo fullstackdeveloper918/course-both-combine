@@ -1,6 +1,5 @@
 import { Sequelize } from 'sequelize';
 import { database } from '../config/config.js';
-
 const sequelize = new Sequelize(
   database.name,
   database.user,
@@ -21,20 +20,15 @@ const sequelize = new Sequelize(
     },
   }
 );
-
 try {
   await sequelize.authenticate();
-  console.log('✅ Database connected successfully.');
+  console.log(':white_check_mark: Database connected successfully.');
 } catch (err) {
-  console.error('❌ Database connection error:', err);
+  console.error(':x: Database connection error:', err);
 }
-
 export default sequelize;
-
-
 // import { Sequelize } from "sequelize";
 // import { database } from "../config/config.js";
-
 // const sequelize = new Sequelize(
 //   database.name,
 //   database.user,
@@ -56,12 +50,10 @@ export default sequelize;
 //     },
 //   }
 // );
-
 // try {
 //   await sequelize.authenticate();
-//   console.log("✅ Database connected successfully.");
+//   console.log(":white_check_mark: Database connected successfully.");
 // } catch (err) {
-//   console.error("❌ Database connection error:", err);
+//   console.error(":x: Database connection error:", err);
 // }
-
 // export default sequelize;

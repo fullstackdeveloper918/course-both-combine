@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 dotenv.config();
-
 export const app = {
   port: process.env.PORT || 3000,
   baseUrl: process.env.BASE_URL || "http://localhost:3000",
@@ -22,8 +21,6 @@ export const database = {
   user: "u448961291_courses",
   password: "5Zd^f*Xw",
 };
-
-
 // export const database = {
 //   logging: process.env.DB_LOGGING === "true",
 //   username: "u448961291_course_platfor",
@@ -33,7 +30,6 @@ export const database = {
 //   port: 3306,
 //   dialect: "mysql",
 // };
-
 export const shopify = {
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecret: process.env.SHOPIFY_API_SECRET,
@@ -44,7 +40,6 @@ export const shopify = {
   vendor: process.env.SHOPIFY_VENDOR || "Course Platform",
   merchantId: process.env.SHOPIFY_MERCHANT_ID,
 };
-
 export const storage = {
   provider:
     process.env.STORAGE_PROVIDER ||
@@ -68,13 +63,11 @@ export const storage = {
     region: process.env.BUNNY_REGION || "de",
   },
 };
-
 export const limits = {
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 1024 * 1024 * 100, // 100MB
   maxUploadSize: parseInt(process.env.MAX_UPLOAD_SIZE) || 1024 * 1024 * 500, // 500MB
   maxFilesPerUpload: parseInt(process.env.MAX_FILES_PER_UPLOAD) || 50,
 };
-
 export const jwt = {
   secret: process.env.JWT_SECRET,
   expiresIn: process.env.JWT_EXPIRES_IN || "24h",

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { Upload } from "tus-js-client";
 import crypto from "crypto";
-import { error, log } from "console";
+// import { error, log } from "console";
 
 const STORAGE_ZONE_NAME = process.env.BUNNY_STORAGE_ZONE_NAME;
 const ACCESS_KEY = process.env.BUNNY_STORAGE_KEY;
@@ -494,8 +494,10 @@ export const deleteBunnyStorageFile = async (relativePath) => {
         AccessKey: ACCESS_KEY,
       },
     });
+    console.log("deleted running....");
 
     if (response.status === 200) {
+      console.log(`File ${relativePath} deleted from Bunny Storage.`);
       return true;
     } else {
       console.warn(
