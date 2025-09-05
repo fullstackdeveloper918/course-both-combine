@@ -211,8 +211,7 @@ app.post("/api/products/create", async (req, res) => {
 
     if (!merchant) {
       console.warn("No merchant found ");
-            return res.status(200).send({ message: "No merchant found" });
-
+      return res.status(200).send({ message: "No merchant found" });
     }
 
     // get the product price
@@ -284,8 +283,7 @@ app.post("/api/products/update", async (req, res) => {
 
     if (!variants?.length) {
       console.warn("No variants  found");
-            return res.status(200).send({ message: "No variants found" });
-
+      return res.status(200).send({ message: "No variants found" });
     }
 
     // // find the merchant
@@ -296,7 +294,7 @@ app.post("/api/products/update", async (req, res) => {
 
     if (!merchant) {
       console.warn("No merchant found ");
-            return res.status(200).send({ message: "No merchant found" });
+      return res.status(200).send({ message: "No merchant found" });
     }
     let merchantdetails = merchant.dataValues;
 
@@ -320,8 +318,7 @@ app.post("/api/products/update", async (req, res) => {
 
     if (!course) {
       console.warn("No course found ");
-                  return res.status(200).send({ message: "No course found" });
-
+      return res.status(200).send({ message: "No course found" });
     }
 
     let db_sync_updated_at_value = course.dataValues.sync_updated_at
@@ -336,8 +333,7 @@ app.post("/api/products/update", async (req, res) => {
         sync_updated_at_value?.getTime() === db_sync_updated_at_value?.getTime()
       ) {
         console.warn("No update found ");
-     return res.status(200).send({ message: "No update found" });
-
+        return res.status(200).send({ message: "No update found" });
       }
     }
 
@@ -402,6 +398,7 @@ app.post("/api/products/delete", async (req, res) => {
 
     const { id } = req.body;
 
+    console.log("id...", id);
     const course = await Course.findOne({
       where: { shopifyProductId: id },
       include: [
@@ -425,16 +422,16 @@ app.post("/api/products/delete", async (req, res) => {
     });
 
     if (!course) {
-                  return res.status(200).send({ message: "No course found" });
-
+      return res.status(200).send({ message: "No course found" });
     }
     let merchantdetails = await Merchant.findOne({
       where: { id: course.merchantId },
     });
     if (!merchantdetails) {
       console.log("Merchant not found for this course.");
-               return res.status(200).send({ message: "merchant not found for this course" });
-
+      return res
+        .status(200)
+        .send({ message: "merchant not found for this course" });
     }
     console.log("merchantdetails", merchantdetails.id);
 

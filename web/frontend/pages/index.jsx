@@ -26,6 +26,10 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkError, setBulkError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredCourses, setFilteredCourses] = useState([]);
 
@@ -84,11 +88,37 @@ export default function HomePage() {
       body: formData, // No need to set headers
     });
 
-      if (response.ok) {
-        fetchCourses();
-        setIsCreateModalOpen(false);
+    if (response.ok) {
+      fetchCourses();
+      setIsCreateModalOpen(false);
     } else {
       console.error("Failed to create course");
+    }
+  };
+
+  const handleBulkUpload = async (e) => {
+    e.preventDefault();
+    if (!bulkFile) return;
+    setBulkLoading(true);
+    setBulkError(null);
+    try {
+      const formData = new FormData();
+      formData.append("csvFile", bulkFile);
+      const response = await fetch("/api/courses/bulkupload", {
+        method: "POST",
+        body: formData,
+      });
+      if (response.ok) {
+        fetchCourses();
+        setIsBulkModalOpen(false);
+        setBulkFile(null);
+      } else {
+        setBulkError("Failed to upload CSV");
+      }
+    } catch (error) {
+      setBulkError(error.message);
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -149,15 +179,26 @@ export default function HomePage() {
                 Welcome back! Here's what's happening with your courses.
               </p>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              New Course
-            </motion.button>
+            <div className="flex gap-3">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                New Course
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+                onClick={() => setIsBulkModalOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Upload With CSV
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>
@@ -314,6 +355,51 @@ export default function HomePage() {
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateCourse}
       />
+
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <form
+            className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4"
+            onSubmit={handleBulkUpload}
+          >
+            <h2 className="text-lg font-semibold mb-4">
+              Upload Courses with CSV
+            </h2>
+            <div className="mb-4">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => setBulkFile(e.target.files[0])}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                required
+              />
+            </div>
+            {bulkError && (
+              <div className="text-red-600 mb-4 text-sm">{bulkError}</div>
+            )}
+            <div className="flex gap-4">
+              <button
+                className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                type="button"
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkFile(null);
+                  setBulkError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                type="submit"
+                disabled={bulkLoading || !bulkFile}
+              >
+                {bulkLoading ? "Uploading..." : "Upload"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

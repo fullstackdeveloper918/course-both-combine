@@ -64,11 +64,9 @@ export default function moduleManager() {
       const data = await response.json();
       console.log(data.data, courseId, "fetch module data");
 
-     const filteredModules = Array.isArray(data?.data)
-  ? data.data
-      .filter(module => module.courseId === courseId)
-      .reverse()  // if data.data is newest first, reverse to get oldest first
-  : [];
+      const filteredModules = Array.isArray(data?.data)
+        ? data.data.filter((module) => module.courseId === courseId).reverse() // if data.data is newest first, reverse to get oldest first
+        : [];
 
       setmodules(filteredModules);
 
@@ -121,12 +119,12 @@ export default function moduleManager() {
         order: 1,
       });
       const response = await fetch(`/api/modules/${editmodule.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: data,
-    });
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: data,
+      });
       if (response.ok) {
         fetchmodules(id);
         setIsEditModalOpen(false);
@@ -161,12 +159,13 @@ export default function moduleManager() {
 
   const handleBulkUpload = async (e) => {
     e.preventDefault();
-    if (!bulkFile) return;
+    if (!bulkFile || !id) return;
     setBulkLoading(true);
     setBulkError(null);
     try {
       const formData = new FormData();
-      formData.append("file", bulkFile);
+      formData.append("csvFile", bulkFile);
+      formData.append("courseId", id);
       const response = await fetch("/api/modules/bulkupload", {
         method: "POST",
         body: formData,
@@ -245,24 +244,26 @@ export default function moduleManager() {
                 Manage your modules and their content
               </p>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
-              onClick={() => setModuleModal(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add module
-            </motion.button>
-            {/* <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition-colors ml-4"
-              onClick={() => setIsBulkModalOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Bulk Upload
-            </motion.button> */}
+            <div className="flex gap-3">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                onClick={() => setModuleModal(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add module
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+                onClick={() => setIsBulkModalOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Upload With CSV
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>
@@ -410,33 +411,42 @@ export default function moduleManager() {
         </div>
       )}
       {isBulkModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
           <form
-            className="bg-white p-6 rounded-lg shadow-lg"
+            className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4"
             onSubmit={handleBulkUpload}
           >
             <h2 className="text-lg font-semibold mb-4">
-              Bulk Upload modules (CSV)
+              Upload Modules with CSV
             </h2>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => setBulkFile(e.target.files[0])}
-              required
-            />
-            {bulkError && <div className="text-red-600 mt-2">{bulkError}</div>}
-            <div className="flex gap-4 mt-6">
+            <div className="mb-4">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => setBulkFile(e.target.files[0])}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                required
+              />
+            </div>
+            {bulkError && (
+              <div className="text-red-600 mb-4 text-sm">{bulkError}</div>
+            )}
+            <div className="flex gap-4">
               <button
-                className="bg-gray-200 px-4 py-2 rounded"
+                className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                 type="button"
-                onClick={() => setIsBulkModalOpen(false)}
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkFile(null);
+                  setBulkError(null);
+                }}
               >
                 Cancel
               </button>
               <button
-                className="bg-blue-600 text-white px-4 py-2 rounded"
+                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                 type="submit"
-                disabled={bulkLoading}
+                disabled={bulkLoading || !bulkFile}
               >
                 {bulkLoading ? "Uploading..." : "Upload"}
               </button>

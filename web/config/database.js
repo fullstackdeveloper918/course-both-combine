@@ -1,5 +1,5 @@
-import { Sequelize } from 'sequelize';
-import { database } from '../config/config.js';
+import { Sequelize } from "sequelize";
+import { database } from "../config/config.js";
 const sequelize = new Sequelize(
   database.name,
   database.user,
@@ -7,12 +7,13 @@ const sequelize = new Sequelize(
   {
     host: database.host, // e.g. "mysql-xxxxx.render.com"
     port: database.port ?? 3306,
-    dialect: 'mysql',
+    dialect: "mysql",
     logging: database.logging ? console.log : false,
     define: { timestamps: true, underscored: true },
     pool: { max: 5, min: 0, acquire: 60000, idle: 10000 },
     dialectOptions: {
       connectTimeout: 30000,
+
       ssl: {
         require: true,
         rejectUnauthorized: false, // temporary; if Render provides CA cert, replace with that
@@ -22,9 +23,9 @@ const sequelize = new Sequelize(
 );
 try {
   await sequelize.authenticate();
-  console.log(':white_check_mark: Database connected successfully.');
+  console.log(":white_check_mark: Database connected successfully.");
 } catch (err) {
-  console.error(':x: Database connection error:', err);
+  console.error(":x: Database connection error:", err);
 }
 export default sequelize;
 // import { Sequelize } from "sequelize";

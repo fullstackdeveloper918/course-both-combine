@@ -41,7 +41,7 @@ export default function CourseManager() {
   const [bulkError, setBulkError] = useState(null);
   const [moduleModal, setModuleModal] = useState(false);
   const [moduleModalEdit, setModuleModalEdit] = useState(false);
-  const [loadingDelete,setLoadingDelete]= useState()
+  const [loadingDelete, setLoadingDelete] = useState();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -223,15 +223,15 @@ export default function CourseManager() {
               <Plus className="h-4 w-4" />
               New Course
             </motion.button>
-            {/* <motion.button
+            <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition-colors ml-4"
+              className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors ml-4"
               onClick={() => setIsBulkModalOpen(true)}
             >
               <Plus className="h-4 w-4" />
-              Bulk Upload
-            </motion.button> */}
+              Upload With CSV
+            </motion.button>
           </div>
         </div>
       </div>
@@ -377,11 +377,12 @@ export default function CourseManager() {
               >
                 Cancel
               </button>
-              <button disabled={loadingDelete}
+              <button
+                disabled={loadingDelete}
                 onClick={confirmDeleteCourse}
                 className="px-4 py-2 cursor-pointer rounded-lg text-white bg-red-600 hover:bg-red-700 transition"
               >
-             {loadingDelete ? "Loading..." : "Delete"}   
+                {loadingDelete ? "Loading..." : "Delete"}
               </button>
             </div>
           </div>
