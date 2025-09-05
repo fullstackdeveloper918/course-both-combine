@@ -47,6 +47,7 @@ export const createCourse = async (req, res, next) => {
   let accessToken = "";
   let merchantdetails;
   const session = res.locals.shopify?.session || req.session;
+  console.log("session", session);
 
   let shopDomain = session.shop;
 
@@ -73,6 +74,7 @@ export const createCourse = async (req, res, next) => {
     const merchantId = merchant.id;
     merchantdetails = merchant;
     accessToken = merchant.shopifyAccessToken;
+    console.log("accessToken", accessToken);
 
     // getting the course details
     const { title, description, price } = req.body;
@@ -553,11 +555,10 @@ export const updateCourse = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const session = res.locals.shopify?.session || req.session;
-    
-  
-    let   shopDomain = session.shop;
-    if(!shopDomain)throw new ApiError("Unauthorized: No valid Shopify session.", 401);
-    
+
+    let shopDomain = session.shop;
+    if (!shopDomain)
+      throw new ApiError("Unauthorized: No valid Shopify session.", 401);
 
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
     if (!merchant) {
@@ -872,12 +873,13 @@ export const uploadCoursesFromCSV = async (req, res) => {
 
     filePath = req.file.path;
     const session = res.locals.shopify?.session || req.session;
-    
 
-  
-    let   shopDomain = session.shop;
-    if(!shopDomain) throw new ApiError("Unauthorized: No valid Shopify session.", 401);
-  
+    console.log("session", session);
+
+    let shopDomain = session.shop;
+
+    if (!shopDomain)
+      throw new ApiError("Unauthorized: No valid Shopify session.", 401);
 
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
     if (!merchant) throw new ApiError("Merchant not found for this shop.", 404);
@@ -1116,7 +1118,7 @@ export const getCourseDetails = async (req, res) => {
 // Delete Course
 export const deleteCourse = async (req, res) => {
   const session = res.locals.shopify?.session || req.session;
-  const shopDomain = session?.shop;
+  const shopDomain = session.shop;
   const courseId = req.params.id;
 
   console.log("delete course running");
@@ -1175,7 +1177,7 @@ export const deleteCourse = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Deleting proccess started....",
+      message: "Deleting course successfully",
     });
   } catch (error) {
     console.error("Error deleting course:", error);
@@ -1189,11 +1191,11 @@ export const deleteCourse = async (req, res) => {
 export const GetMerchantDetails = async (req, res) => {
   try {
     const session = res.locals.shopify?.session || req.session;
-  
 
-  let     shopDomain = session.shop;
+    let shopDomain = session.shop;
 
-    if(!shopDomain)throw new ApiError("Unauthorized: No valid Shopify session.", 401);
+    if (!shopDomain)
+      throw new ApiError("Unauthorized: No valid Shopify session.", 401);
 
     const merchant = await Merchant.findOne({
       where: { shop: shopDomain },
