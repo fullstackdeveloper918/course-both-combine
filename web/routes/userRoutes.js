@@ -9,7 +9,7 @@ import {
 } from "../controllers/userController.js";
 
 const router = express.Router();
-
+// test
 router.get("/", getUsers);
 router.get("/:id", getUser);
 router.post("/", createUser);
