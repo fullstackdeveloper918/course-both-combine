@@ -392,6 +392,7 @@ app.post("/api/products/update", async (req, res) => {
 });
 
 // delete the product webhook
+// TODO:
 app.post("/api/products/delete", async (req, res) => {
   try {
     console.log("delete product webhook received");
