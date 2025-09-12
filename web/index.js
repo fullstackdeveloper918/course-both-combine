@@ -58,15 +58,10 @@ const __dirname = join(__filename, "..");
 
 const app = express();
 app.use(cors());
-// app.use(cors({
-//   origin: "*",
-//   methods: "*",
-//   allowedHeaders: "*"
-// }));
+
 app.use(express.urlencoded({ extended: true, limit: "800mb" }));
 // app.use(express.static("./uploads"));
 // parse application/json
-app.use(express.json({ limit: "800mb" }));
 const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || "3000",
   10
@@ -86,6 +81,8 @@ app.get(shopify.config.auth.path, shopify.auth.begin());
 
 // Helper to register all Shopify webhooks for a shop
 async function registerAllWebhooks(shop, accessToken) {
+  console.log("register webhook run..");
+
   const topics = [
     "orders/create",
     "orders/cancelled",
@@ -96,7 +93,7 @@ async function registerAllWebhooks(shop, accessToken) {
     "products/delete",
   ];
   const baseUrl = process.env.APP_BASE_URL;
-
+  console.log("baseUrl", baseUrl);
   for (const topic of topics) {
     const address = `${baseUrl}/api/${topic.replace("/", "/")}`;
 
@@ -137,10 +134,15 @@ app.get(
     (async () => {
       try {
         const session = res.locals.shopify.session;
+        console.log("sesson details..", session);
+
         const shopDomain = session.shop;
         let merchant = await Merchant.findOne({
           where: { shopifyDomain: shopDomain },
         });
+
+        console.log("merchant deatails..", merchant);
+
         let isNew = false;
         if (!merchant) {
           merchant = await Merchant.create({
@@ -150,10 +152,14 @@ app.get(
             email: session.email || null,
             name: session.shop || null,
           });
+          console.log("if section Update merhcnat details..", merchant);
+
           isNew = true;
         } else if (merchant.get("shopifyAccessToken") !== session.accessToken) {
           // Update access token if it changed
           await merchant.update({ shopifyAccessToken: session.accessToken });
+          console.log("else section merchant update details", merchant);
+
           isNew = true;
         }
         // Register webhooks if new merchant or access token changed
@@ -172,6 +178,8 @@ app.post(
   shopify.config.webhooks.path,
   shopify.processWebhooks({ webhookHandlers: PrivacyWebhookHandlers })
 );
+
+app.use(express.json({ limit: "800mb" }));
 
 // Convert HTML to plain text
 const stripHtml = (html) => {
@@ -255,7 +263,7 @@ app.post("/api/products/create", async (req, res) => {
     res.status(500).send({ message: "Internal server error" });
   }
 });
-app.post("/api/webhooks/orders/create", async (req, res) => {
+app.post("/api/orders/create", async (req, res) => {
   console.log(req.body, "req.body");
   res.status(200).send({ message: "Webhook received" });
 });

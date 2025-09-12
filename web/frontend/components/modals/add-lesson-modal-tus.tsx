@@ -313,14 +313,6 @@ export default function AddLessonModalTus({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.videoFile) {
-      setUploadState((prev) => ({
-        ...prev,
-        error: "Please select a video file first",
-      }));
-      return;
-    }
-
     // Start lesson creation progress
     setLessonCreationState({
       status: "creating",
@@ -329,65 +321,77 @@ export default function AddLessonModalTus({
     });
 
     try {
-      // Step 1: Create Bunny upload URL
-      setLessonCreationState((prev) => ({ ...prev, progress: 20 }));
+      let videoGuid = null;
 
-      const uploadResponse = await fetch("/api/lessons/createBunnyTusUpload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          courseId,
-          moduleId,
-        }),
-      });
+      // Only upload video if a video file is provided
+      if (formData.videoFile) {
+        // Step 1: Create Bunny upload URL
+        setLessonCreationState((prev) => ({ ...prev, progress: 20 }));
 
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to create upload URL");
+        const uploadResponse = await fetch(
+          "/api/lessons/createBunnyTusUpload",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              courseId,
+              moduleId,
+            }),
+          }
+        );
+
+        if (!uploadResponse.ok) {
+          throw new Error("Failed to create upload URL");
+        }
+
+        const uploadData = await uploadResponse.json();
+        const { uploadUrl, streamApiKey, videoGuid: newVideoGuid } = uploadData;
+        videoGuid = newVideoGuid;
+
+        // Step 2: Upload video to Bunny CDN
+        setLessonCreationState((prev) => ({ ...prev, progress: 30 }));
+        setUploadState({
+          status: "uploading",
+          progress: 0,
+          videoGuid: null,
+          error: null,
+        });
+
+        await uploadToBunnyDirect(
+          formData.videoFile,
+          uploadUrl,
+          {
+            AccessKey: streamApiKey,
+            "Content-Type": formData.videoFile.type,
+          },
+          (progress) => {
+            setUploadState((prev) => ({
+              ...prev,
+              progress: progress.percentage,
+            }));
+            // Update lesson creation progress based on upload progress
+            const lessonProgress = 30 + progress.percentage * 0.4; // 30% to 70%
+            setLessonCreationState((prev) => ({
+              ...prev,
+              progress: Math.round(lessonProgress),
+            }));
+          }
+        );
+
+        setUploadState({
+          status: "completed",
+          progress: 100,
+          videoGuid,
+          error: null,
+        });
+      } else {
+        // No video file, skip upload and go directly to lesson creation
+        setLessonCreationState((prev) => ({ ...prev, progress: 50 }));
       }
 
-      const uploadData = await uploadResponse.json();
-      const { uploadUrl, streamApiKey, videoGuid } = uploadData;
-
-      // Step 2: Upload video to Bunny CDN
-      setLessonCreationState((prev) => ({ ...prev, progress: 30 }));
-      setUploadState({
-        status: "uploading",
-        progress: 0,
-        videoGuid: null,
-        error: null,
-      });
-
-      await uploadToBunnyDirect(
-        formData.videoFile,
-        uploadUrl,
-        {
-          AccessKey: streamApiKey,
-          "Content-Type": formData.videoFile.type,
-        },
-        (progress) => {
-          setUploadState((prev) => ({
-            ...prev,
-            progress: progress.percentage,
-          }));
-          // Update lesson creation progress based on upload progress
-          const lessonProgress = 30 + progress.percentage * 0.4; // 30% to 70%
-          setLessonCreationState((prev) => ({
-            ...prev,
-            progress: Math.round(lessonProgress),
-          }));
-        }
-      );
-
-      setUploadState({
-        status: "completed",
-        progress: 100,
-        videoGuid,
-        error: null,
-      });
-
-      // Step 3: Create lesson with video GUID
+      // Step 3: Create lesson (with or without video GUID)
       setLessonCreationState((prev) => ({ ...prev, progress: 80 }));
 
       const submitData = new FormData();
@@ -397,7 +401,9 @@ export default function AddLessonModalTus({
       submitData.append("order", formData.order);
       submitData.append("courseId", courseId);
       submitData.append("moduleId", moduleId);
-      submitData.append("videoGuid", videoGuid);
+      if (videoGuid) {
+        submitData.append("videoGuid", videoGuid);
+      }
       submitData.append("isPreview", "true");
 
       if (formData.thumbnail) {
@@ -798,7 +804,9 @@ export default function AddLessonModalTus({
 
             <div className="w-100">
               <div className="flex-col flex">
-                <Label htmlFor="video-upload">Video Upload (MP4)</Label>
+                <Label htmlFor="video-upload">
+                  Video Upload (MP4) - Optional
+                </Label>
 
                 {uploadState.status === "idle" && !formData.videoFile && (
                   <>
@@ -872,7 +880,7 @@ export default function AddLessonModalTus({
               disabled={
                 uploadState.status === "uploading" ||
                 lessonCreationState.status === "creating" ||
-                !formData.videoFile
+                !formData.title
               }
               className="text-white cursor-pointer bg-purple-600 hover:bg-purple-700"
             >

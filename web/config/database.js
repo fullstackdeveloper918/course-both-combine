@@ -14,10 +14,10 @@ const sequelize = new Sequelize(
     dialectOptions: {
       connectTimeout: 30000,
 
-      ssl: {
-        require: true,
-        rejectUnauthorized: false, // temporary; if Render provides CA cert, replace with that
-      },
+      // ssl: {
+      //   require: true,
+      //   rejectUnauthorized: false, // temporary; if Render provides CA cert, replace with that
+      // },
     },
   }
 );

@@ -339,13 +339,14 @@ export const createLesson = async (req, res) => {
       videoGuid, // passed from frontend after client uploads video using pre-signed URL
       isPreview = true,
     } = req.body;
+    console.log(req.body, "req.body");
 
-    if (!videoGuid) {
-      throw new ApiError(
-        "videoGuid is required; client must upload video separately.",
-        400
-      );
-    }
+    // if (!videoGuid) {
+    //   throw new ApiError(
+    //     "videoGuid is required; client must upload video separately.",
+    //     400
+    //   );
+    // }
 
     // Validate course & module ownership
     const courseData = await Course.findOne({
@@ -440,10 +441,16 @@ export const createLesson = async (req, res) => {
     }
 
     // Get video processing info and duration from Bunny Stream API
-    const videoInfo = await waitForVideoProcessing({ videoGuid, maxTries: 4 });
     let videoDuration = 0;
-    if (videoInfo.success) {
-      videoDuration = videoInfo.data.length;
+
+    if (videoGuid) {
+      const videoInfo = await waitForVideoProcessing({
+        videoGuid,
+        maxTries: 4,
+      });
+      if (videoInfo.success) {
+        videoDuration = videoInfo.data.length;
+      }
     }
 
     // Create lesson record
@@ -462,29 +469,31 @@ export const createLesson = async (req, res) => {
       processingStatus: videoDuration > 0 ? "completed" : "processing",
       duration: videoDuration,
       merchantId: merchant.id,
-      videoId: videoGuid,
+      videoId: videoGuid ? videoGuid : null,
       libaryId: merchant.StreamLibraryId || process.env.STREAM_LIB_ID,
     });
     if (!lesson) throw new ApiError("Failed to create lesson.", 500);
     lessonId = lesson.id;
 
-    if (videoDuration <= 0) {
-      const videoInfo = await waitForVideoProcessing({
-        videoGuid,
-        maxTries: 2,
-      });
-      let videoDurationres = 0;
-      if (videoInfo.success) {
-        videoDurationres = videoInfo.data.length;
-      }
-      if (videoDurationres > 0) {
-        try {
-          await Lesson.update(
-            { duration: videoDurationres, processingStatus: "completed" },
-            { where: { id: lessonId } }
-          );
-        } catch (error) {
-          console.warn(`Failed to update lesson duration: ${error}`);
+    if (videoGuid) {
+      if (videoDuration <= 0) {
+        const videoInfo = await waitForVideoProcessing({
+          videoGuid,
+          maxTries: 2,
+        });
+        let videoDurationres = 0;
+        if (videoInfo.success) {
+          videoDurationres = videoInfo.data.length;
+        }
+        if (videoDurationres > 0) {
+          try {
+            await Lesson.update(
+              { duration: videoDurationres, processingStatus: "completed" },
+              { where: { id: lessonId } }
+            );
+          } catch (error) {
+            console.warn(`Failed to update lesson duration: ${error}`);
+          }
         }
       }
     }
@@ -1773,12 +1782,11 @@ export const getLessons = async (req, res) => {
 export const getLesson = async (req, res) => {
   try {
     const session = res.locals.shopify?.session || req.session;
- 
 
-  
-    let  shopDomain = session.shop;
+    let shopDomain = session.shop;
 
-    if(!shopDomain)throw new ApiError("Unauthorized: No valid Shopify session.", 401);
+    if (!shopDomain)
+      throw new ApiError("Unauthorized: No valid Shopify session.", 401);
 
     const merchant = await Merchant.findOne({ where: { shop: shopDomain } });
 
@@ -1827,22 +1835,24 @@ export const getLesson = async (req, res) => {
 
     // let resdata = await axios.get("http://localhost:5000/VideosStreamWorker");
     // console.log(resdata.data);
+    let token = null;
+    if (lesson?.videoId) {
+      let hlsurl = generateSecureStreamUrl({
+        libraryId: merchant?.streamLibraryId || process.env.STREAM_LIB_ID,
+        videoGuid: lesson?.videoId,
+        securityKey:
+          merchant?.streamSecureTokenApiKey ||
+          process.env.STREAM_SECURE_TOKEN_KEY,
+      });
 
-    let hlsurl = generateSecureStreamUrl({
-      libraryId: merchant?.streamLibraryId || process.env.STREAM_LIB_ID,
-      videoGuid: lesson?.videoId,
-      securityKey:
-        merchant?.streamSecureTokenApiKey ||
-        process.env.STREAM_SECURE_TOKEN_KEY,
-    });
-
-    let token = jwt.sign(
-      {
-        url: hlsurl,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "90m" }
-    );
+      token = jwt.sign(
+        {
+          url: hlsurl,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "90m" }
+      );
+    }
     let { videoId, ...cleanup } = { ...lesson?.dataValues };
     res.status(200).json({
       success: true,

@@ -17,6 +17,8 @@ export default function LessonViewPage() {
   const [lessonId, setLessonId] = useState(null);
   const [loading, setLoading] = useState();
   const [error, setError] = useState(null);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [videoError, setVideoError] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -55,43 +57,116 @@ export default function LessonViewPage() {
   }
 
   useEffect(() => {
-  if (!lesson?.videoUrl || !videoRef.current) return;
+    if (!lesson || !videoRef.current) {
+      setVideoLoading(false);
+      return;
+    }
 
-  let videoUrl = lesson.videoUrl;
+    // Reset video states
+    setVideoLoading(true);
+    setVideoError(null);
 
-  try {
-    // Optional: If it's a JWT, decode it
-    if (videoUrl.includes(".")) {
-      const decoded = jwtDecode(videoUrl);
-      if (decoded?.url) {
-        videoUrl = decoded.url;
-        // videoUrl ="https://vz-3b1984a4-21d.b-cdn.net/687c880c-1837-4e6f-bba5-b3ef59ff85a8/playlist.m3u8"
+    // If no video URL, set loading to false and return
+    if (!lesson.videoUrl) {
+      setVideoLoading(false);
+      return;
+    }
+
+    let videoUrl = lesson.videoUrl;
+    let hls = null;
+
+    try {
+      // Optional: If it's a JWT, decode it
+      if (videoUrl.includes(".")) {
+        const decoded = jwtDecode(videoUrl);
+        if (decoded?.url) {
+          videoUrl = decoded.url;
+        }
       }
+
+      console.log("Final video URL:", videoUrl);
+
+      // Setup video event listeners
+      const videoElement = videoRef.current;
+
+      const handleCanPlay = () => {
+        setVideoLoading(false);
+        setVideoError(null);
+      };
+
+      const handleError = (e) => {
+        console.error("Video error:", e);
+        setVideoLoading(false);
+        setVideoError("Failed to load video. Please try again later.");
+      };
+
+      videoElement.addEventListener("canplay", handleCanPlay);
+      videoElement.addEventListener("error", handleError);
+
+      // Initialize HLS player
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          debug: false,
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90,
+        });
+
+        hls.loadSource(videoUrl);
+        hls.attachMedia(videoElement);
+
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          console.log("HLS media attached");
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+          console.log(
+            "HLS manifest parsed, quality levels:",
+            data.levels.length
+          );
+          setVideoLoading(false);
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error("HLS error:", data);
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                setVideoError("Network error occurred while loading video.");
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                setVideoError("Media error occurred. Please try again.");
+                break;
+              default:
+                setVideoError("An error occurred while loading the video.");
+            }
+            setVideoLoading(false);
+          }
+        });
+      } else if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
+        // Native HLS support (Safari)
+        videoElement.src = videoUrl;
+      } else {
+        setVideoError("Your browser does not support video streaming.");
+        setVideoLoading(false);
+      }
+
+      // Cleanup function
+      return () => {
+        if (hls) {
+          hls.destroy();
+        }
+        if (videoElement) {
+          videoElement.removeEventListener("canplay", handleCanPlay);
+          videoElement.removeEventListener("error", handleError);
+        }
+      };
+    } catch (error) {
+      console.error("Error setting up video player:", error);
+      setVideoError("Failed to initialize video player.");
+      setVideoLoading(false);
     }
-
-    console.log("Final video URL:", videoUrl);
-
-    if (Hls.isSupported()) {
-      const hls = new Hls();
-      hls.loadSource(videoUrl);
-      hls.attachMedia(videoRef.current);
-
-      hls.on(Hls.Events.ERROR, function (event, data) {
-        console.error("HLS error:", data);
-      });
-
-      return () => hls.destroy();
-    } else if (
-      videoRef.current.canPlayType("application/vnd.apple.mpegurl")
-    ) {
-      videoRef.current.src = videoUrl;
-    } else {
-      console.error("This browser does not support HLS.");
-    }
-  } catch (error) {
-    console.error("Error decoding video token or setting up HLS:", error);
-  }
-}, [lesson]);
+  }, [lesson]);
 
   console.log(videoRef, "reff here to see data");
 
@@ -147,22 +222,60 @@ export default function LessonViewPage() {
             <div className="lg:col-span-2">
               <Card>
                 <CardContent className="p-0">
-                  <div className="aspect-video bg-black rounded-t-lg overflow-hidden">
-                    {lesson.videoUrl ? (
+                  <div className="aspect-video bg-black rounded-t-lg overflow-hidden relative">
+                    {videoLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
+                        <div className="text-center text-white">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                          <p className="text-lg">Loading video...</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {videoError && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
+                        <div className="text-center text-white p-6">
+                          <div className="text-6xl mb-4">⚠️</div>
+                          <h3 className="text-xl font-semibold mb-2">
+                            Video Error
+                          </h3>
+                          <p className="text-gray-300 mb-4">{videoError}</p>
+                          <button
+                            onClick={() => window.location.reload()}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded transition-colors"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!lesson.videoUrl && !videoLoading && !videoError && (
+                      <div className="flex items-center justify-center h-full bg-gradient-to-br from-gray-800 to-gray-900">
+                        <div className="text-center text-white p-8">
+                          <div className="text-6xl mb-4">📚</div>
+                          <h3 className="text-2xl font-semibold mb-2">
+                            No Video Available
+                          </h3>
+                          <p className="text-gray-300 mb-4 max-w-md">
+                            This lesson doesn't include a video. You can still
+                            access the lesson content and materials below.
+                          </p>
+                          <div className="flex items-center justify-center space-x-2 text-sm text-gray-400">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span>Lesson content ready</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {lesson.videoUrl && !videoError && (
                       <video
                         ref={videoRef}
                         controls
-                        autoPlay
-                        muted
                         className="w-full h-full"
+                        preload="metadata"
                       />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-white">
-                        <div className="text-center">
-                          <div className="text-6xl mb-4">📹</div>
-                          <p>No video available</p>
-                        </div>
-                      </div>
                     )}
                   </div>
 

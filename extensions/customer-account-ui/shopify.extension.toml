@@ -3,6 +3,9 @@ api_version = "2025-04"
 [[extensions]]
 name = "custmer-latest"
 handle = "custmer-latest"
+
+uid = "ef2ce4a6-8bf6-999b-cc9d-6e0c2a1179fefb9b92dc"
+
 type = "ui_extension"
 
 [[extensions.targeting]]
