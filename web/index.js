@@ -60,6 +60,8 @@ const app = express();
 app.use(cors());
 
 app.use(express.urlencoded({ extended: true, limit: "800mb" }));
+app.use(express.json({ limit: "800mb" }));
+
 // app.use(express.static("./uploads"));
 // parse application/json
 const PORT = parseInt(
@@ -178,8 +180,6 @@ app.post(
   shopify.config.webhooks.path,
   shopify.processWebhooks({ webhookHandlers: PrivacyWebhookHandlers })
 );
-
-app.use(express.json({ limit: "800mb" }));
 
 // Convert HTML to plain text
 const stripHtml = (html) => {
