@@ -217,7 +217,10 @@ export const createCourse = async (req, res, next) => {
 // Get all courses
 export const getCourses = async (req, res, next) => {
   try {
+    console.log("runi");
+
     const session = res.locals.shopify?.session || req.session;
+    console.log("session123", session);
 
     let shopDomain = session.shop;
 
@@ -868,13 +871,14 @@ const checkImageExists = async (url) => {
 
 export const uploadCoursesFromCSV = async (req, res) => {
   let filePath;
+
   try {
     if (!req.file) throw new ApiError("CSV file is required", 400);
 
     filePath = req.file.path;
     const session = res.locals.shopify?.session || req.session;
 
-    console.log("session", session);
+    console.log("session123", session);
 
     let shopDomain = session.shop;
 
@@ -894,45 +898,133 @@ export const uploadCoursesFromCSV = async (req, res) => {
       throw new ApiError("Invalid CSV format", 400);
     }
 
+    res.status(200).json({
+      success: true,
+      message: "CSV file uploaded Processing is start",
+      courseList,
+    });
+
+    console.log("courseList", courseList);
+
+    // Group CSV data by course name
+    const groupedCourses = {};
+    for (const row of courseList) {
+      const courseName = row.CourseName?.trim();
+      if (!courseName) continue;
+
+      if (!groupedCourses[courseName]) {
+        groupedCourses[courseName] = {
+          courseData: {
+            title: courseName,
+            description: row.CourseDescription?.trim() || "Default Description",
+            thumbnail: row.CourseThumbnail?.trim(),
+            price: row.CoursePrice?.trim() || "0.00",
+          },
+          modules: {},
+        };
+      }
+
+      const moduleName = row.ModuleName?.trim();
+      if (!moduleName) continue;
+
+      if (!groupedCourses[courseName].modules[moduleName]) {
+        groupedCourses[courseName].modules[moduleName] = {
+          moduleData: {
+            title: moduleName,
+            description: row.ModuleDescription?.trim() || "",
+          },
+          lessons: [],
+        };
+      }
+
+      // Add lesson if it has required data
+      if (row.LessonName?.trim() && row.LessonOrder) {
+        groupedCourses[courseName].modules[moduleName].lessons.push({
+          order: parseInt(row.LessonOrder),
+          title: row.LessonName?.trim(),
+          videoUrl: row.LessonVideoURL?.trim(),
+          helperFiles: row.LessonHelperFiles?.trim() || "",
+        });
+      }
+    }
+
+    console.log("groupedCourses", groupedCourses);
+
     const createdCourses = [];
-    const faildprocess = [];
-    for (const course of courseList) {
+    const failedCourses = [];
+
+    // Process each course
+    for (const [courseName, courseGroup] of Object.entries(groupedCourses)) {
       let productid;
       let collection_Id;
-      let destinationPath = `Coursethumbnails/${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}.webp`;
       let thumbnailurl = null;
+      let thumbnailDestinationPath = null;
+      let createdCourseId = null;
+      let createdModuleIds = [];
+      let createdLessonIds = [];
+      let createdFileIds = [];
+      let transaction;
 
       try {
-        let { title, description, thumbnail, price } = course;
+        const { title, description, thumbnail, price } = courseGroup.courseData;
+        console.log("Course Data");
+        console.log("title", title);
+        console.log("description", description);
+        console.log("thumbnail", thumbnail);
+        console.log("price", price);
 
-        title = title ? title?.trim() : "Default Title";
-        description = description ? description?.trim() : "Default Description";
-        // thumbnail = thumbnail ? thumbnail : process.env.DEFAULT_THUMBNAIL;
-        price = price ? price?.trim() : "0.00";
+        // Check if course already exists by title for this merchant
+        const existingCourse = await Course.findOne({
+          where: {
+            title: title,
+            merchantId: merchantId,
+          },
+        });
 
-        if (thumbnail) {
-          try {
-            let resdata = await uploadRemoteThumbnailToBunny({
-              sourceUrl: thumbnail,
-              storageZone:
-                merchant?.BUNNY_STORAGE_ZONE_NAME ||
-                process.env.BUNNY_STORAGE_ZONE_NAME,
-              accessKey:
-                merchant?.BUNNY_STORAGE_KEY || process.env.BUNNY_STORAGE_KEY,
-              destinationPath: destinationPath,
-              cdnHostname:
-                merchant?.PUBLIC_CDN_URL || process.env.PUBLIC_CDN_URL,
-            });
-
-            thumbnailurl = resdata?.cdnUrl;
-          } catch (error) {
-            console.warn("Failed to upload thumbnail to Bunny", error);
-          }
+        if (existingCourse) {
+          console.log(
+            `Course "${title}" already exists for this merchant, skipping...`
+          );
+          failedCourses.push({
+            courseName,
+            error: "Course with this title already exists for this merchant",
+          });
+          continue;
         }
 
-        // Shopify Product Creation
+        // Upload course thumbnail to Bunny if provided (outside transaction)
+        if (thumbnail) {
+          try {
+            // Validate URL first
+            const urlTest = await fetch(thumbnail, { method: "HEAD" });
+            if (!urlTest.ok) {
+              console.warn(`Course thumbnail URL not accessible: ${thumbnail}`);
+            } else {
+              thumbnailDestinationPath = `Coursethumbnails/${Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2)}.webp`;
+              let resdata = await uploadRemoteThumbnailToBunny({
+                sourceUrl: thumbnail,
+                storageZone:
+                  merchant?.BUNNY_STORAGE_ZONE_NAME ||
+                  process.env.BUNNY_STORAGE_ZONE_NAME,
+                accessKey:
+                  merchant?.BUNNY_STORAGE_KEY || process.env.BUNNY_STORAGE_KEY,
+                destinationPath: thumbnailDestinationPath,
+                cdnHostname:
+                  merchant?.PUBLIC_CDN_URL || process.env.PUBLIC_CDN_URL,
+              });
+              thumbnailurl = resdata?.cdnUrl;
+              console.log(` Thumbnail uploaded successfully: ${thumbnailurl}`);
+            }
+          } catch (error) {
+            console.warn("Failed to upload course thumbnail to Bunny", error);
+          }
+        } else {
+          console.log(` No thumbnail provided for course: ${title}`);
+        }
+
+        // Shopify Product Creation (outside transaction)
         const productPayload = {
           product: {
             title,
@@ -964,16 +1056,15 @@ export const uploadCoursesFromCSV = async (req, res) => {
 
         const shopifyData = await shopifyRes.json();
         if (!shopifyRes.ok || !shopifyData.product) {
-          console.warn(
-            "Failed to create Shopify product with csv",
-            shopifyData
-          );
-          throw new ApiError("Failed creation of Shopify product", 500);
+          throw new ApiError("Failed to create Shopify product", 500);
         }
-        // get product id
-        productid = shopifyData.product.id;
 
-        // Creating A Collection of the course
+        productid = shopifyData.product.id;
+        console.log(
+          `🛍️ Shopify product created successfully: ${title} (ID: ${productid})`
+        );
+
+        // Creating A Collection for the course
         let collectionId = await createCollection({
           LibraryId: merchant?.StreamLibraryId || LibId,
           apiKey: merchant?.StreamApiKEY || StreamApiKEY,
@@ -981,13 +1072,18 @@ export const uploadCoursesFromCSV = async (req, res) => {
         });
 
         collection_Id = collectionId?.guid;
+        console.log(
+          `📚 Bunny collection created successfully: ${collection_Id}`
+        );
 
-        // create a course in the database
+        // Create course in the database
         const savedCourse = await Course.create({
           title,
           description,
           thumbnail: thumbnailurl,
-          thumbnailDestinationPath: thumbnailurl ? destinationPath : null,
+          thumbnailDestinationPath: thumbnailurl
+            ? thumbnailDestinationPath
+            : null,
           price,
           collectionid: collectionId?.guid,
           shopifyProductId: shopifyData.product.id,
@@ -995,45 +1091,226 @@ export const uploadCoursesFromCSV = async (req, res) => {
           merchantId,
         });
 
-        createdCourses.push(savedCourse);
-      } catch (error) {
-        faildprocess.push(course);
-        // Deleted the  shopify product if created
-        if (productid) {
-          await deleteShopifyProduct(shopDomain, accessToken, productid);
-        }
-        // delete the collection if created
-        if (collection_Id) {
-          await deleteStreamCollection({
-            LibraryId: merchant?.StreamLibraryId || LibId,
-            collectionId: collection_Id,
-            apiKey: merchant?.StreamApiKEY || StreamApiKEY,
+        createdCourseId = savedCourse.id;
+        console.log(
+          `✅ Course created successfully in database: ${title} (ID: ${createdCourseId})`
+        );
+
+        // Process modules and lessons
+        let moduleOrder = 1;
+        for (const [moduleName, moduleGroup] of Object.entries(
+          courseGroup.modules
+        )) {
+          // Create module
+
+          console.log("module Details");
+          console.log("moduleName", moduleName);
+          console.log("moduleGroup", moduleGroup);
+
+          const savedModule = await Module.create({
+            title: moduleGroup.moduleData.title,
+            description: moduleGroup.moduleData.description,
+            order: moduleOrder++,
+            courseId: savedCourse.id,
           });
-        }
-        // delete the bunny thumbnail if created
-        if (thumbnailurl) {
-          await deleteBunnyStorageFile(destinationPath);
+
+          console.log("Module created Succsufly");
+
+          createdModuleIds.push(savedModule.id);
+
+          // Sort lessons by order
+          const sortedLessons = moduleGroup.lessons.sort(
+            (a, b) => a.order - b.order
+          );
+
+          for (const lessonData of sortedLessons) {
+            let videoId = null;
+            let videoUrl = null;
+            let videoDestinationPath = null;
+
+            console.log("Lesson Details");
+            console.log("lessonData", lessonData);
+
+            // Upload video to Bunny if URL provided
+            if (lessonData.videoUrl) {
+              try {
+                const videoUploadResult = await uploadRemoteVideoToBunny({
+                  sourceUrl: lessonData.videoUrl,
+                  storageZone:
+                    merchant?.BUNNY_STORAGE_ZONE_NAME ||
+                    process.env.BUNNY_STORAGE_ZONE_NAME,
+                  accessKey:
+                    merchant?.BUNNY_STORAGE_KEY ||
+                    process.env.BUNNY_STORAGE_KEY,
+                  collectionId: collection_Id,
+                  merchant,
+                  lessonTitle: lessonData.title,
+                });
+
+                if (videoUploadResult.success) {
+                  videoId = videoUploadResult.videoId;
+                  console.log(
+                    `🎥 Video uploaded successfully for lesson "${lessonData.title}": ${videoId}`
+                  );
+                } else {
+                  console.warn(
+                    `❌ Failed to upload video for lesson "${lessonData.title}": ${videoUploadResult.error}`
+                  );
+                }
+              } catch (error) {
+                console.warn(
+                  `Failed to upload video for lesson ${lessonData.title}:`,
+                  error
+                );
+              }
+            }
+
+            // Create lesson
+            const savedLesson = await Lesson.create({
+              title: lessonData.title,
+              description: `Lesson ${lessonData.order}: ${lessonData.title}`,
+              order: lessonData.order,
+              moduleId: savedModule.id,
+              courseId: savedCourse.id,
+              merchantId,
+              videoId: videoId,
+              status: "published",
+              libaryId: merchant?.StreamLibraryId || LibId,
+            });
+
+            createdLessonIds.push(savedLesson.id);
+
+            // Process helper files if provided
+            if (lessonData.helperFiles) {
+              const fileUrls = lessonData.helperFiles
+                .split(",")
+                .map((url) => url.trim())
+                .filter((url) => url);
+
+              for (const fileUrl of fileUrls) {
+                try {
+                  // Validate URL accessibility first
+                  const urlTest = await fetch(fileUrl, {
+                    method: "HEAD",
+                    timeout: 10000, // 10 second timeout
+                  });
+
+                  if (!urlTest.ok) {
+                    console.warn(
+                      `Helper file URL not accessible: ${fileUrl} (Status: ${urlTest.status})`
+                    );
+                    continue; // Skip this file but continue with others
+                  }
+
+                  // Check file size before downloading
+                  const contentLength = urlTest.headers.get("content-length");
+                  const fileSize = contentLength ? parseInt(contentLength) : 0;
+                  const maxSize = 100 * 1024 * 1024; // 100MB
+
+                  if (fileSize > maxSize) {
+                    console.warn(
+                      `Helper file too large: ${fileUrl} (${fileSize} bytes > ${maxSize} bytes)`
+                    );
+                    continue;
+                  }
+
+                  const fileUploadResult = await uploadRemoteFileToBunny({
+                    sourceUrl: fileUrl,
+                    storageZone:
+                      merchant?.BUNNY_STORAGE_ZONE_NAME ||
+                      process.env.BUNNY_STORAGE_ZONE_NAME,
+                    accessKey:
+                      merchant?.BUNNY_STORAGE_KEY ||
+                      process.env.BUNNY_STORAGE_KEY,
+                    merchant,
+                    fileName: fileUrl.split("/").pop() || "file",
+                  });
+
+                  if (fileUploadResult.success) {
+                    const savedFile = await File.create({
+                      name: fileUploadResult.fileName,
+                      type: fileUploadResult.fileType,
+                      url: fileUploadResult.cdnUrl,
+                      size: fileUploadResult.fileSize,
+                      mimeType: fileUploadResult.mimeType,
+                      lessonId: savedLesson.id,
+                      courseId: savedCourse.id,
+                      storageProvider: "bunny",
+                      destinationPath: fileUploadResult.destinationPath,
+                    });
+
+                    createdFileIds.push(savedFile.id);
+                    console.log(
+                      `📎 Helper file uploaded successfully: ${fileUploadResult.fileName} (${fileUploadResult.fileSize} bytes)`
+                    );
+                  } else {
+                    console.warn(
+                      `❌ Failed to upload helper file ${fileUrl}: ${fileUploadResult.error}`
+                    );
+                  }
+                } catch (error) {
+                  console.warn(
+                    `Failed to process helper file ${fileUrl}:`,
+                    error.message
+                  );
+                  // Continue with other files even if one fails
+                }
+              }
+            }
+          }
         }
 
-        console.error("Failed to create course:", error?.message);
+        createdCourses.push({
+          course: savedCourse,
+          modulesCount: Object.keys(courseGroup.modules).length,
+          lessonsCount: Object.values(courseGroup.modules).reduce(
+            (acc, module) => acc + module.lessons.length,
+            0
+          ),
+        });
+      } catch (error) {
+        // Cleanup created resources
+        await cleanupCreatedResources({
+          productid,
+          collection_Id,
+          thumbnailDestinationPath,
+          createdCourseId,
+          createdModuleIds,
+          createdLessonIds,
+          createdFileIds,
+          shopDomain,
+          accessToken,
+          merchant,
+        });
+
+        failedCourses.push({
+          courseName,
+          error: error.message,
+        });
+
+        console.error(`Failed to create course ${courseName}:`, error?.message);
       }
     }
 
-    return res.status(200).json({
-      success: true,
-      message: `Processed CSV: ${createdCourses.length} created, ${faildprocess.length} failed.`,
-      createdCourses,
-      faildprocess,
-    });
+    // return res.status(200).json({
+    //   success: true,
+    //   message: `Processed CSV: ${createdCourses.length} courses created successfully, ${failedCourses.length} courses failed.`,
+    //   createdCourses,
+    //   failedCourses,
+    // });
   } catch (error) {
     console.error("Bulk upload error:", error);
     res.status(500).json({ success: false, error: error.message });
   } finally {
+    // Delete uploaded CSV file
     if (filePath) {
       try {
         await fs2.unlink(filePath);
       } catch (err) {
-        console.warn(" Failed to delete thumbnail from the local", err.message);
+        console.warn(
+          "Failed to delete CSV file from local storage",
+          err.message
+        );
       }
     }
   }
@@ -1431,3 +1708,468 @@ async function uploadRemoteThumbnailToBunny({
     // cdnUrl: `https://${cdnHostname}/${destinationPath.replace(/^\/+/, "")}`,
   };
 }
+
+// Function to upload remote video to Bunny CDN
+async function uploadRemoteVideoToBunny({
+  sourceUrl,
+  storageZone,
+  accessKey,
+  collectionId,
+  merchant,
+  lessonTitle,
+  maxFileSizeBytes = 2 * 1024 * 1024 * 1024, // 2GB safeguard for videos
+  maxRetries = 3,
+}) {
+  if (!sourceUrl || !storageZone || !accessKey || !collectionId) {
+    throw new Error("Missing required Bunny Video params");
+  }
+
+  try {
+    // Helper: delay for retries
+    const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // Helper: fetch without timeout for large videos
+    async function fetchWithoutTimeout(url, options = {}) {
+      return await fetch(url, options);
+    }
+
+    // 1) Fetch remote video file with retries
+    let videoRes;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        videoRes = await fetchWithoutTimeout(sourceUrl);
+        if (!videoRes.ok) throw new Error(`Fetch failed: ${videoRes.status}`);
+        break; // success
+      } catch (err) {
+        // Handle network errors specifically for source video fetch
+        if (
+          err.name === "NetworkError" ||
+          err.message.includes("network") ||
+          err.message.includes("fetch")
+        ) {
+          console.log(
+            `Source video fetch attempt ${attempt} failed due to network error, retrying...`
+          );
+          if (attempt === maxRetries) {
+            throw new Error(
+              `Failed to fetch source video after ${maxRetries} attempts due to network issues. The source URL may be unreachable or your internet connection unstable.`
+            );
+          }
+          continue; // Retry on network errors
+        }
+        await delay(1000 * attempt); // exponential backoff
+      }
+    }
+
+    // 2) Enforce max size
+    const contentLength = parseInt(
+      videoRes.headers.get("content-length") || "0",
+      10
+    );
+    if (contentLength && contentLength > maxFileSizeBytes) {
+      throw new Error(
+        `Source video too large (${contentLength} bytes, limit ${maxFileSizeBytes})`
+      );
+    }
+
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+    if (videoBuffer.length > maxFileSizeBytes) {
+      throw new Error(
+        `Source video exceeded max size after download (${videoBuffer.length} bytes)`
+      );
+    }
+
+    // 3) Create video record in Bunny Stream
+    const libraryId = merchant?.StreamLibraryId || LibId;
+    const apiKey = merchant?.StreamApiKEY || StreamApiKEY;
+
+    const videoPayload = {
+      title: lessonTitle || "Lesson Video",
+      collectionId: collectionId,
+    };
+
+    const createVideoRes = await fetch(
+      `https://video.bunnycdn.com/library/${libraryId}/videos`,
+      {
+        method: "POST",
+        headers: {
+          AccessKey: apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(videoPayload),
+      }
+    );
+
+    const videoData = await createVideoRes.json();
+    if (!createVideoRes.ok || !videoData.guid) {
+      throw new Error("Failed to create video record in Bunny Stream");
+    }
+
+    console.log("video title created succfully Step 1");
+
+    const videoGuid = videoData.guid;
+
+    // 4) Upload video to Bunny Stream
+    const uploadUrl = `https://video.bunnycdn.com/library/${libraryId}/videos/${videoGuid}`;
+
+    let uploadRes;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        uploadRes = await fetchWithoutTimeout(uploadUrl, {
+          method: "PUT",
+          headers: {
+            AccessKey: apiKey,
+            "Content-Type": "application/octet-stream",
+          },
+          body: videoBuffer,
+        });
+
+        if (uploadRes.ok && uploadRes.status === 200) {
+          console.log("video uploaded successfully Step 2");
+          break; // success
+        }
+
+        // Handle duplicate upload error
+        if (uploadRes.status === 400) {
+          const errorText = await uploadRes.text();
+          try {
+            const errorData = JSON.parse(errorText);
+            if (
+              errorData.message &&
+              errorData.message.includes("already been uploaded")
+            ) {
+              console.log(
+                "Video already uploaded, proceeding with existing video"
+              );
+              break; // Treat as success
+            }
+          } catch (e) {
+            // Not JSON, continue with normal error handling
+          }
+        }
+
+        // Handle network errors specifically
+        if (
+          err.name === "NetworkError" ||
+          err.message.includes("network") ||
+          err.message.includes("fetch")
+        ) {
+          console.log(
+            `Upload attempt ${attempt} failed due to network error, retrying...`
+          );
+          if (attempt === maxRetries) {
+            throw new Error(
+              `Video upload failed after ${maxRetries} attempts due to network issues. Please check your internet connection and try again.`
+            );
+          }
+          continue; // Retry on network errors
+        }
+
+        const t = await uploadRes.text().catch(() => "");
+        throw new Error(
+          `Video upload failed: ${uploadRes.status} ${uploadRes.statusText} ${t}`
+        );
+      } catch (err) {
+        console.log("video upload failed ", err.message);
+        if (attempt === maxRetries) {
+          // Cleanup: delete the video record if upload fails
+          try {
+            await fetch(
+              `https://video.bunnycdn.com/library/${libraryId}/videos/${videoGuid}`,
+              {
+                method: "DELETE",
+                headers: { AccessKey: apiKey },
+              }
+            );
+          } catch (cleanupErr) {
+            console.warn("Failed to cleanup video record:", cleanupErr.message);
+          }
+          throw new Error(
+            `Bunny video upload failed after ${maxRetries} attempts: ${err.message}`
+          );
+        }
+        await delay(2000 * attempt); // backoff
+      }
+    }
+
+    // 5) Skip video processing to save time for long videos
+    console.log("Skipping video processing for faster upload");
+
+    return {
+      success: true,
+      videoId: videoGuid,
+      destinationPath: `videos/${videoGuid}`,
+    };
+  } catch (error) {
+    console.error("Error uploading remote video to Bunny:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+// Function to upload remote file to Bunny CDN Storage
+async function uploadRemoteFileToBunny({
+  sourceUrl,
+  storageZone,
+  accessKey,
+  merchant,
+  fileName,
+  maxFileSizeBytes = 100 * 1024 * 1024, // 100MB safeguard for files
+  maxRetries = 3,
+  timeoutMs = 30000, // 30s timeout
+}) {
+  if (!sourceUrl || !storageZone || !accessKey || !fileName) {
+    throw new Error("Missing required Bunny File params");
+  }
+
+  try {
+    // Helper: delay for retries
+    const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // Helper: fetch with timeout
+    async function fetchWithTimeout(url, options = {}, timeout = timeoutMs) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(id);
+      }
+    }
+
+    // 1) Fetch remote file with retries
+    let fileRes;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `Attempting to fetch file: ${sourceUrl} (attempt ${attempt}/${maxRetries})`
+        );
+        fileRes = await fetchWithTimeout(sourceUrl);
+
+        if (!fileRes.ok) {
+          const errorDetails = {
+            status: fileRes.status,
+            statusText: fileRes.statusText,
+            url: sourceUrl,
+            attempt: attempt,
+          };
+
+          if (fileRes.status === 404) {
+            throw new Error(`File not found (404): ${sourceUrl}`);
+          } else if (fileRes.status === 403) {
+            throw new Error(`Access forbidden (403): ${sourceUrl}`);
+          } else if (fileRes.status >= 500) {
+            throw new Error(`Server error (${fileRes.status}): ${sourceUrl}`);
+          } else {
+            throw new Error(`HTTP ${fileRes.status}: ${sourceUrl}`);
+          }
+        }
+
+        // Validate content type
+        const contentType = fileRes.headers.get("content-type");
+        if (!contentType && fileRes.status === 200) {
+          console.warn(`No content-type header for: ${sourceUrl}`);
+        }
+
+        console.log(
+          `Successfully fetched file: ${sourceUrl} (${contentType}, size: ${fileRes.headers.get(
+            "content-length"
+          )} bytes)`
+        );
+        break; // success
+      } catch (err) {
+        console.warn(
+          `Fetch attempt ${attempt} failed for ${sourceUrl}: ${err.message}`
+        );
+
+        if (attempt === maxRetries) {
+          throw new Error(
+            `Failed to fetch source file after ${maxRetries} attempts: ${err.message}`
+          );
+        }
+
+        // Exponential backoff with jitter
+        const backoffTime = Math.min(
+          1000 * attempt * (1 + Math.random()),
+          10000
+        );
+        console.log(`Waiting ${backoffTime}ms before retry...`);
+        await delay(backoffTime);
+      }
+    }
+
+    // 2) Enforce max size
+    const contentLength = parseInt(
+      fileRes.headers.get("content-length") || "0",
+      10
+    );
+    if (contentLength && contentLength > maxFileSizeBytes) {
+      throw new Error(
+        `Source file too large (${contentLength} bytes, limit ${maxFileSizeBytes})`
+      );
+    }
+
+    const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+    if (fileBuffer.length > maxFileSizeBytes) {
+      throw new Error(
+        `Source file exceeded max size after download (${fileBuffer.length} bytes)`
+      );
+    }
+
+    // 3) Determine file type and generate destination path
+    const contentType =
+      fileRes.headers.get("content-type") || "application/octet-stream";
+    const fileExtension = fileName.split(".").pop()?.toLowerCase() || "bin";
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).slice(2);
+    const destinationPath = `files/${timestamp}-${randomString}.${fileExtension}`;
+
+    // Determine file type based on content type and extension
+    let fileType = "other";
+    if (contentType.startsWith("video/")) fileType = "video";
+    else if (contentType === "application/pdf") fileType = "pdf";
+    else if (contentType.includes("zip") || contentType.includes("rar"))
+      fileType = "zip";
+    else if (contentType.startsWith("image/")) fileType = "image";
+    else if (fileExtension === "png") fileType = "png";
+
+    // 4) Upload to Bunny Storage with retries
+    const uploadUrl = `https://storage.bunnycdn.com/${storageZone}/${destinationPath}`;
+
+    let uploadRes;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        uploadRes = await fetchWithTimeout(uploadUrl, {
+          method: "PUT",
+          headers: {
+            AccessKey: accessKey,
+            "Content-Type": contentType,
+          },
+          body: fileBuffer,
+        });
+
+        if (uploadRes.ok && uploadRes.status === 201) break; // success
+        const t = await uploadRes.text().catch(() => "");
+        throw new Error(
+          `File upload failed: ${uploadRes.status} ${uploadRes.statusText} ${t}`
+        );
+      } catch (err) {
+        if (attempt === maxRetries) {
+          throw new Error(
+            `Bunny file upload failed after ${maxRetries} attempts: ${err.message}`
+          );
+        }
+        await delay(2000 * attempt); // backoff
+      }
+    }
+
+    const cdnHostname = merchant?.PUBLIC_CDN_URL || process.env.PUBLIC_CDN_URL;
+
+    return {
+      success: true,
+      fileName: fileName,
+      fileType: fileType,
+      cdnUrl: `${cdnHostname}/${destinationPath}`,
+      fileSize: fileBuffer.length,
+      mimeType: contentType,
+      destinationPath: destinationPath,
+    };
+  } catch (error) {
+    console.error("Error uploading remote file to Bunny:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+// Function to cleanup created resources on failure
+async function cleanupCreatedResources({
+  productid,
+  collection_Id,
+  thumbnailDestinationPath,
+  createdCourseId,
+  createdModuleIds,
+  createdLessonIds,
+  createdFileIds,
+  shopDomain,
+  accessToken,
+  merchant,
+}) {
+  const cleanupPromises = [];
+
+  // Delete Shopify product if created
+  if (productid) {
+    cleanupPromises.push(
+      deleteShopifyProduct(shopDomain, accessToken, productid).catch((err) =>
+        console.warn("Failed to delete Shopify product:", err.message)
+      )
+    );
+  }
+
+  // Delete Bunny collection if created
+  if (collection_Id) {
+    cleanupPromises.push(
+      deleteStreamCollection({
+        LibraryId: merchant?.StreamLibraryId || LibId,
+        collectionId: collection_Id,
+        apiKey: merchant?.StreamApiKEY || StreamApiKEY,
+      }).catch((err) =>
+        console.warn("Failed to delete Bunny collection:", err.message)
+      )
+    );
+  }
+
+  // Delete Bunny thumbnail if created
+  if (thumbnailDestinationPath) {
+    cleanupPromises.push(
+      deleteBunnyStorageFile(thumbnailDestinationPath).catch((err) =>
+        console.warn("Failed to delete Bunny thumbnail:", err.message)
+      )
+    );
+  }
+
+  // Delete database records if created
+  if (createdFileIds.length > 0) {
+    cleanupPromises.push(
+      File.destroy({ where: { id: createdFileIds } }).catch((err) =>
+        console.warn("Failed to delete files from database:", err.message)
+      )
+    );
+  }
+
+  if (createdLessonIds.length > 0) {
+    cleanupPromises.push(
+      Lesson.destroy({ where: { id: createdLessonIds } }).catch((err) =>
+        console.warn("Failed to delete lessons from database:", err.message)
+      )
+    );
+  }
+
+  if (createdModuleIds.length > 0) {
+    cleanupPromises.push(
+      Module.destroy({ where: { id: createdModuleIds } }).catch((err) =>
+        console.warn("Failed to delete modules from database:", err.message)
+      )
+    );
+  }
+
+  if (createdCourseId) {
+    cleanupPromises.push(
+      Course.destroy({ where: { id: createdCourseId } }).catch((err) =>
+        console.warn("Failed to delete course from database:", err.message)
+      )
+    );
+  }
+
+  // Execute all cleanup operations in parallel
+  await Promise.allSettled(cleanupPromises);
+}
+
+/*
+Uplaod a course and there modules and lessons with csv
+created by lovepreet singh
+createdat: 2025-09-16
+*/

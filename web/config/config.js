@@ -5,27 +5,29 @@ export const app = {
   baseUrl: process.env.BASE_URL || "http://localhost:3000",
   env: process.env.NODE_ENV || "development",
 };
-// export const database = {
-//   logging: process.env.DB_LOGGING === "true",
-//   host: process.env.DB_HOST || "localhost",
-//   port: process.env.DB_PORT || 3306,
-//   name: process.env.DB_NAME,
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD,
-// };
+
 export const database = {
-  //logging: process.env.DB_LOGGING === "true",
-  host: "193.203.184.57",
-  port: 3306,
-  name: "u448961291_courses",
-  user: "u448961291_courses",
-  password: "5Zd^f*Xw",
+  logging: process.env.DB_LOGGING === "true",
+  host: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 3306,
+  name: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
 };
+
+// export const database = {
+//   //logging: process.env.DB_LOGGING === "true",
+//   host: "193.203.184.57",
+//   port: 3306,
+//   name: "u448961291_courses",
+//   user: "u448961291_courses",
+//   password: "5Zd^f*Xw",
+// };
 
 export const shopify = {
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecret: process.env.SHOPIFY_API_SECRET,
-  apiVersion: process.env.SHOPIFY_API_VERSION || "2024-01",
+  apiVersion: process.env.SHOPIFY_API_VERSIONx || "2024-01",
   shopName: process.env.SHOPIFY_SHOP_NAME,
   accessToken: process.env.SHOPIFY_ACCESS_TOKEN,
   webhookSecret: process.env.SHOPIFY_WEBHOOK_SECRET,

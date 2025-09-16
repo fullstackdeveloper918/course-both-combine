@@ -46,6 +46,9 @@ import cors from "cors";
 import slug from "slug";
 import Module from "./models/Module.js";
 import File from "./models/File.js";
+import User from "./models/User.js";
+import CourseAccess from "./models/CourseAccess.js";
+import { log } from "console";
 
 // Load environment variables
 dotenv.config();
@@ -264,19 +267,150 @@ app.post("/api/products/create", async (req, res) => {
   }
 });
 app.post("/api/orders/create", async (req, res) => {
+  try {
+    console.log("order create webhook recieved");
+
+    const { id, line_items, customer } = req.body;
+    let shop = req.headers["x-shopify-shop-domain"];
+
+    console.log("order create webhook received", req.body);
+
+    if (!id || !line_items?.length || !customer) {
+      return res.status(200).send({ message: "Webhook received" });
+    }
+
+    // const course = await Course.findOne({
+    //   where: { shopifyProductId: line_items[0].product_id },
+    // });
+    // if (!course) return res.status(200).send({ message: "No course found" });
+
+    const merchant = await Merchant.findOne({
+      where: { shop: shop },
+    });
+
+    if (!merchant)
+      return res.status(200).send({ message: "No merchant found" });
+
+    let userdetails = await User.findOne({
+      where: { merchantId: merchant.id, shopifyCustomerId: customer.id },
+    });
+
+    if (!userdetails) {
+      console.warn("user cant find");
+      return;
+    }
+
+    for (const item of line_items) {
+      try {
+        const course = await Course.findOne({
+          where: { shopifyProductId: item.product_id },
+        });
+        if (!course) {
+          console.warn("course not found");
+          continue;
+        }
+
+        const courseAccess = await CourseAccess.upsert({
+          courseId: course.id,
+          userId: userdetails.id,
+          shopifyOrderId: id,
+          merchantId: merchant.id,
+          shopifyCustomerId: customer.id,
+        });
+
+        console.log("Course access created:", courseAccess.id);
+      } catch (error) {
+        console.error("Course access not created", error);
+      }
+    }
+
+    res.status(200).send({ message: "Webhook processed" });
+  } catch (error) {
+    console.error("Order webhook error:", error);
+    res.status(200).send({ message: "Webhook received with error" });
+  }
+});
+
+app.post("/api/orders/cancelled", async (req, res) => {
   console.log(req.body, "req.body");
   res.status(200).send({ message: "Webhook received" });
 });
-app.post("/api/webhooks/orders/cancelled", async (req, res) => {
+app.post("/api/customers/create", async (req, res) => {
+  try {
+    const customer = req.body;
+    let shop = req.headers["x-shopify-shop-domain"];
+
+    console.log("customer data", customer);
+
+    if (!customer?.id) {
+      console.warn("Customer webhook: no customer id");
+      return res.status(200).send({ message: "Webhook received" });
+    }
+
+    // 1️⃣ Find the merchant (depends on your setup —
+    // if you have multiple stores, you might pass shop domain via headers)
+    // For now, assume single-merchant system
+    const merchant = await Merchant.findOne({ where: { shop: shop } });
+    if (!merchant) {
+      console.warn("Customer webhook: no merchant found");
+      return res.status(200).send({ message: "Webhook received" });
+    }
+
+    let user = await User.create({
+      shopifyCustomerId: customer.id,
+      email: customer.email,
+      firstName: customer.first_name,
+      lastName: customer.last_name,
+      role: "student", // default role
+      merchantId: merchant.id,
+    });
+
+    console.log("User created:", user.id);
+
+    res.status(200).send({ message: "Customer webhook processed" });
+  } catch (error) {
+    console.error("Customer webhook error:", error);
+    res.status(200).send({ message: "Webhook received with error" });
+  }
+});
+
+app.post("/api/customers/update", async (req, res) => {
+  let shop = req.headers["x-shopify-shop-domain"];
+  let customer = req.body;
+  console.log("shop", shop);
   console.log(req.body, "req.body");
-  res.status(200).send({ message: "Webhook received" });
-});
-app.post("/api/webhooks/customers/create", async (req, res) => {
-  // console.log(req.body, "product create data");
-  res.status(200).send({ message: "Webhook received" });
-});
-app.post("/api/webhooks/customers/update", async (req, res) => {
-  // console.log(req.body, "req.body");
+
+  let merchant = await Merchant.findOne({
+    where: {
+      shop: shop,
+    },
+  });
+
+  if (!merchant) {
+    console.warn("Customer webhook: no merchant found");
+    return res.status(200).send({ message: "Webhook received" });
+  }
+
+  let user = await User.findOne({
+    where: {
+      shopifyCustomerId: customer.id,
+      merchantId: merchant.id,
+    },
+  });
+
+  if (!user) {
+    console.warn("Customer webhook: no user found");
+    return res.status(200).send({ message: "Webhook received" });
+  }
+
+  await user.update({
+    email: customer.email,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+  });
+
+  console.log("User updated");
+
   res.status(200).send({ message: "Webhook received" });
 });
 

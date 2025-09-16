@@ -38,13 +38,15 @@ function CourseCards() {
 
   const payload = decodeJwt(token);
   const storeDomain =
-    "https://ar-preventing-documentation-intense.trycloudflare.com";
+    "https://establishing-emma-lafayette-languages.trycloudflare.com";
 
   useEffect(() => {
     // fetch(`${storeDomain}/api/frontend/courses`)
     fetch(`/apps/api/frontend/courses`)
       .then((res) => res.json())
       .then(async (data) => {
+        console.log("resData", data.data);
+
         if (data.success && Array.isArray(data.data)) {
           setCourses(data.data);
 
@@ -67,8 +69,10 @@ function CourseCards() {
           setError("No courses found.");
         }
       })
-      .catch(() => {
-        setError("Failed to load courses.");
+      .catch((err) => {
+        console.log("err", err);
+
+        setError("Failed to load coursesssss.");
       });
   }, []);
 
@@ -117,7 +121,7 @@ function CourseCards() {
       <View>
         <BlockStack spacing="loose">
           <Button onPress={() => setSelectedCourse(null)}>
-            ← Back to Courses
+            ← Back to Courses test
           </Button>
           <TextBlock size="large" emphasis="bold">
             {selectedCourse.title}

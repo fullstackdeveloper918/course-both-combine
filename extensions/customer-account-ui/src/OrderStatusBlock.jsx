@@ -69,8 +69,10 @@ function CourseCards() {
           setError("No courses found.");
         }
       })
-      .catch(() => {
-        setError("Failed to load courses.");
+      .catch((err) => {
+        console.log("err", err);
+
+        setError("Failed to load coursesss.");
       });
   }, []);
 
@@ -353,7 +355,9 @@ function CourseCards() {
                     )}
 
                     <Button
-                      to={`${storeDomain}/module-detail?id=${course.slug || course.id}`}
+                      to={`${storeDomain}/module-detail?id=${
+                        course.slug || course.id
+                      }`}
                       appearance="primary"
                       kind="secondary"
                     >

@@ -49,14 +49,7 @@ User.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
-    subscriptionStatus: {
-      type: DataTypes.ENUM("none", "active", "expired", "cancelled"),
-      defaultValue: "none",
-    },
-    subscriptionEndDate: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
+
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,

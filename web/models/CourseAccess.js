@@ -26,6 +26,20 @@ CourseAccess.init(
         key: "id",
       },
     },
+
+    merchantId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "merchants",
+        key: "id",
+      },
+    },
+    shopifyCustomerId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      // unique: true,
+    },
     accessType: {
       type: DataTypes.ENUM("purchase", "subscription", "free"),
       defaultValue: "purchase",
@@ -38,30 +52,34 @@ CourseAccess.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    purchaseDate: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    expiryDate: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    price: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-    },
-    currency: {
-      type: DataTypes.STRING,
-      defaultValue: "USD",
-    },
-    canDownload: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-    },
-    downloadCount: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
+    // purchaseDate: {
+    //   type: DataTypes.DATE,
+    //   allowNull: true,
+    // },
+    // expiryDate: {
+    //   type: DataTypes.DATE,
+    //   allowNull: true,
+    // },
+    // price: {
+    //   type: DataTypes.DECIMAL(10, 2),
+    //   allowNull: true,
+    // },
+    // currency: {
+    //   type: DataTypes.STRING,
+    //   defaultValue: "USD",
+    // },
+    // canDownload: {
+    //   type: DataTypes.BOOLEAN,
+    //   defaultValue: true,
+    // },
+    // downloadCount: {
+    //   type: DataTypes.INTEGER,
+    //   defaultValue: 0,
+    // },
+    // payment_gateway_names: {
+    //   type: DataTypes.STRING,
+    //   allowNull: true,
+    // },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,

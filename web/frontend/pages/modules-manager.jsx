@@ -254,7 +254,7 @@ export default function moduleManager() {
                 <Plus className="h-4 w-4" />
                 Add module
               </motion.button>
-              <motion.button
+              {/* <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
@@ -262,7 +262,7 @@ export default function moduleManager() {
               >
                 <Plus className="h-4 w-4" />
                 Upload With CSV
-              </motion.button>
+              </motion.button> */}
             </div>
           </div>
         </div>

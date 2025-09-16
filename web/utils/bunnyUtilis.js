@@ -376,6 +376,7 @@ export async function uploadToBunnyStorage(localFilePath, destinationPath) {
 
     return { success: true, data: response };
   } catch (err) {
+    console.log(err);
     return { success: false, error: err.response?.data || err.message };
   }
 }
