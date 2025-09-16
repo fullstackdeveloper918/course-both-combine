@@ -5,7 +5,6 @@ handle = "course-new-app"
 application_url = "https://course-both-combine.onrender.com"
 embedded = true
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
 [webhooks]
 api_version = "2025-04"
