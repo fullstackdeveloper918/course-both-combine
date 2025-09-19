@@ -1,0 +1,19 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "5ea55ca1e1bf6504bad1aeed80ec1c2f"
+name = "course-new-testing-app"
+application_url = "https://exclude-enlarge-seminar-ips.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2025-10"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,read_orders,write_customers,write_orders,write_products"
+
+[auth]
+redirect_urls = ["https://exclude-enlarge-seminar-ips.trycloudflare.com/auth/callback", "https://exclude-enlarge-seminar-ips.trycloudflare.com/auth/shopify/callback", "https://exclude-enlarge-seminar-ips.trycloudflare.com/api/auth/callback"]

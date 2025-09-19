@@ -48,7 +48,8 @@ import Module from "./models/Module.js";
 import File from "./models/File.js";
 import User from "./models/User.js";
 import CourseAccess from "./models/CourseAccess.js";
-import { log } from "console";
+// import { log } from "console";
+import frontendroutes from "./routes/frontendRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -61,9 +62,10 @@ const __dirname = join(__filename, "..");
 
 const app = express();
 app.use(cors());
+app.use(express.json({ limit: "800mb" }));
 
 app.use(express.urlencoded({ extended: true, limit: "800mb" }));
-app.use(express.json({ limit: "800mb" }));
+// app.use(express.json({ limit: "800mb" }));
 
 // app.use(express.static("./uploads"));
 // parse application/json
@@ -709,8 +711,9 @@ app.post("/api/BunnyStreamsWebhook", async (req, res) => {
   }
 });
 
-app.use("/api/frontend/courses", courseRoutes);
-app.use("/api/frontend/progress", progressRoutes);
+app.use("/api/frontend", frontendroutes);
+// app.use("/api/frontend/courses", courseRoutes);
+// app.use("/api/frontend/progress", progressRoutes);
 
 // app.get("/api/downloadCourseContent/:id", DownloadCourseContent);
 // Middleware
@@ -743,6 +746,18 @@ app.use("/api/users", userRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/progress", progressRoutes);
 
+// Catch-all route for Shopify app (must be before server starts)
+app.use("/*", shopify.ensureInstalledOnShop(), async (_req, res, _next) => {
+  res
+    .status(200)
+    .set("Content-Type", "text/html")
+    .send(
+      readFileSync(join(STATIC_PATH, "index.html"))
+        .toString()
+        .replace("%VITE_SHOPIFY_API_KEY%", process.env.SHOPIFY_API_KEY || "")
+    );
+});
+
 // Utility to get shop domain with dev fallback
 function getShopDomain(req, res) {
   if (process.env.NODE_ENV === "development") {
@@ -764,14 +779,4 @@ function getShopDomain(req, res) {
     process.exit(1);
   }
 })();
-app.use("/*", shopify.ensureInstalledOnShop(), async (_req, res, _next) => {
-  return res
-    .status(200)
-    .set("Content-Type", "text/html")
-    .send(
-      readFileSync(join(STATIC_PATH, "index.html"))
-        .toString()
-        .replace("%VITE_SHOPIFY_API_KEY%", process.env.SHOPIFY_API_KEY || "")
-    );
-});
 app.use(errorHandler);
